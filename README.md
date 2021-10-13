@@ -26,3 +26,8 @@ git push origin master
 ```
 git pull https://github.com/ojipadeson/faceRecognition
 ```
+
+## 运行
+```
+python test.py
+```
