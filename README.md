@@ -26,9 +26,12 @@ git commit -m "附上的评论"
 git push origin [分支名]
 git push origin master
 ```
-### 添加branch
+### 添加和删除branch
 ```
+# 添加
 git branch [分支名]
+# 删除
+git branch -d [分支名]
 ```
 ### 更新本地
 ```
