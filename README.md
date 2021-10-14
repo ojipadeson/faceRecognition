@@ -1,6 +1,9 @@
 # faceRecognition
 
-## 安装
+## 更新日志
+### <日期> <内容>
+
+## Install
 ### 配置环境
 ```
 pip install -r requirements.txt
