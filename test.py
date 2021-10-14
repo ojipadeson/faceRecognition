@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-# @Author : fangrui
-# @File : test.py
-# !pip install -r requirements.txt
 
 import os
 import cv2
