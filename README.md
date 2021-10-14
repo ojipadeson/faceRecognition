@@ -22,8 +22,13 @@ git add <文件名>
 # 提交代码
 git commit -m "附上的评论"
 
-# 对master（默认）做出修改
+# 对master（默认）做出修改(建议上传到branch)
+git push origin [分支名]
 git push origin master
+```
+### 添加branch
+```
+git branch [分支名]
 ```
 ### 更新本地
 ```
