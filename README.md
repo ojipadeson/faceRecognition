@@ -20,7 +20,6 @@ git clone https://github.com/ojipadeson/faceRecognition
 
 ## Work on faceRecognition
 ### 本地修改上传
-* 修改前先pull，保证与当前文件相同
 ```
 # 做修改并将文件归档 (对每一个要修改的文件执行'git add'或执行'git add .'归档所有文件)
 git add <文件名>
@@ -28,17 +27,17 @@ git add <文件名>
 # 提交代码
 git commit -m "附上的评论"
 
-# 对master（默认）做出修改(建议上传到branch)
-git push origin [分支名]
-git push origin master
-```
-### 添加和删除branch
-```
-# 添加
+# 添加branch
 git branch [分支名]
-# 删除
-git branch -d [分支名]
+
+# 做出修改(上传到branch新建的branch)
+git push origin [分支名]
 ```
+### Pull Request
+
+* 上传新branch后，点```pull request```进行merge，
+  如果不能```automatic merge```再进行讨论或```issue```
+
 ### 更新本地
 ```
 git pull https://github.com/ojipadeson/faceRecognition
