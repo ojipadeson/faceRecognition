@@ -126,7 +126,7 @@ class DetectThread(threading.Thread):
         return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box
 
 
-def main(test_num, confidence, video_record):
+def main(test_num, confidence, video_record, attack_protect):
     global thread_exit
     global ATTACK_WARNING
 
@@ -202,15 +202,18 @@ def main(test_num, confidence, video_record):
                             if _warnings > 0:
                                 _warnings -= 1
                         else:
-                            print('!UNNATURAL ENVIRONMENT. ATTACK-WARNING! ' +
-                                  time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))
-                            _warnings += 1
-                            if _warnings > max((1 - fuse_threshold) * query_length, 10):
-                                ATTACK_WARNING = True
-                                log_f.writelines('A  Attack Warning ' +
-                                                 time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
-                                _warnings = 0
-                                fuse_query = []
+                            if attack_protect:
+                                print('!UNNATURAL ENVIRONMENT. ATTACK-WARNING! ' +
+                                      time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))
+                                _warnings += 1
+                                if _warnings > (1 - fuse_threshold) * query_length * 2:
+                                    ATTACK_WARNING = True
+                                    log_f.writelines('A  Attack Warning ' +
+                                                     time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+                                    _warnings = 0
+                                    fuse_query = []
+                            else:
+                                pass
 
                         cv2.rectangle(
                             frame,
@@ -282,8 +285,9 @@ def main(test_num, confidence, video_record):
 
         if cv2.waitKey(1) & 0xFF == ord('p'):
             ATTACK_WARNING = False
-            log_f.writelines('U  Admin Unlock ' +
-                             time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+            if attack_protect:
+                log_f.writelines('U  Admin Unlock ' +
+                                 time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
         if cv2.waitKey(1) & 0xFF == ord('q'):
             log_f.writelines('C  System Close ' +
                              time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
@@ -307,6 +311,7 @@ def main(test_num, confidence, video_record):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", "--record", help="record the video", action='store_true')
+    parser.add_argument("-p", "--protect", help="protect system from difficult samples", action='store_true')
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
     parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
     args = parser.parse_args()
@@ -317,4 +322,4 @@ if __name__ == "__main__":
     if not 0 < args.confidence <= 1:
         raise Exception('Confidence {conf} is out of range, expected (0, 1] instead.'.format(conf=args.confidence))
 
-    main(args.number, args.confidence, args.record)
+    main(args.number, args.confidence, args.record, args.protect)
