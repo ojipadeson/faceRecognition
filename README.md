@@ -15,6 +15,7 @@ git clone https://github.com/ojipadeson/faceRecognition
 
 ## Work on faceRecognition
 ### 本地修改上传
+* 修改前先pull，保证与当前文件相同
 ```
 # 做修改并将文件归档 (对每一个要修改的文件执行'git add'或执行'git add .'归档所有文件)
 git add <文件名>
