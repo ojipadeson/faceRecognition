@@ -1,0 +1,61 @@
+S  System Start 2021-10-15 06:45:27
+C  System Close 2021-10-15 06:45:52
+
+S  System Start 2021-10-15 07:33:02
+C  System Close 2021-10-15 07:34:11
+
+S  System Start 2021-10-15 07:34:38
+C  System Close 2021-10-15 07:34:49
+
+S  System Start 2021-10-15 07:38:05
+C  System Close 2021-10-15 07:38:13
+
+S  System Start 2021-10-15 07:38:58
+C  System Close 2021-10-15 07:39:02
+
+S  System Start 2021-10-15 07:45:08
+C  System Close 2021-10-15 07:45:14
+
+S  System Start 2021-10-15 07:45:31
+C  System Close 2021-10-15 07:45:35
+
+S  System Start 2021-10-15 07:49:42
+C  System Close 2021-10-15 07:49:51
+
+S  System Start 2021-10-15 07:53:36
+C  System Close 2021-10-15 07:53:47
+
+S  System Start 2021-10-15 07:54:00
+C  System Close 2021-10-15 07:55:43
+
+S  System Start 2021-10-15 07:56:36
+C  System Close 2021-10-15 07:56:47
+
+S  System Start 2021-10-15 07:57:09
+C  System Close 2021-10-15 08:01:03
+
+S  System Start 2021-10-15 08:01:33
+C  System Close 2021-10-15 08:02:11
+
+S  System Start 2021-10-15 08:03:18
+C  System Close 2021-10-15 08:03:32
+
+S  System Start 2021-10-15 08:05:33
+C  System Close 2021-10-15 08:05:54
+
+S  System Start 2021-10-15 08:06:57
+A  Attack Warning 2021-10-15 08:07:07
+U  Admin Unlock 2021-10-15 08:07:16
+U  Admin Unlock 2021-10-15 08:07:16
+A  Attack Warning 2021-10-15 08:07:29
+C  System Close 2021-10-15 08:08:26
+
+S  System Start 2021-10-15 08:10:27
+C  System Close 2021-10-15 08:12:04
+
+S  System Start 2021-10-15 08:15:22
+C  System Close 2021-10-15 08:15:58
+
+S  System Start 2021-10-15 08:26:06
+C  System Close 2021-10-15 08:29:04
+

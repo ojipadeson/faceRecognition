@@ -18,8 +18,8 @@ warnings.filterwarnings('ignore')
 
 thread_lock = threading.Lock()
 thread_exit = False
-# Choose Camera: Web-cam encounter thread conflict
-# capture = cv2.VideoCapture('http://admin:admin@192.168.43.1:8081')
+
+GLOBAL_COUNTER = 0
 capture = cv2.VideoCapture(0)
 
 ATTACK_WARNING = False
@@ -44,10 +44,9 @@ class VideoThread(threading.Thread):
                 thread_lock.release()
             else:
                 thread_exit = True
-        # capture.release()
-        # cv2.destroyAllWindows()
 
 
+# Variable 'name' or any name with initial 'n' is not recommanded to define
 class DetectThread(threading.Thread):
     def __init__(self):
         super(DetectThread, self).__init__()
@@ -63,12 +62,6 @@ class DetectThread(threading.Thread):
         global capture
         model_test = AntiSpoofPredict(0)
         image_cropper = CropImage()
-
-        ########################################################
-        # image = cv2.imread(SAMPLE_IMAGE_PATH + image_name)   #
-        # capture = cv2.VideoCapture()                         #
-        # capture.open(self.camera_id)                         #
-        ########################################################
 
         while not thread_exit:
             ref, image = capture.read()
@@ -109,29 +102,138 @@ class DetectThread(threading.Thread):
                     value = prediction[0][label] / 2
                     thread_lock.acquire()
                     self.score = value
-                    if label == 1:
-                        self.liveness = True
-                        # print("Is Real Face. Score: {:.2f}.".format(value))
-                    else:
-                        self.liveness = False
-                        # print("Is Fake Face. Score: {:.2f}.".format(value))
+                    self.liveness = True if label == 1 else False
                     thread_lock.release()
-                    # print("Prediction cost {:.2f} s".format(test_speed))
             else:
                 thread_exit = True
-        # capture.release()
-        # cv2.destroyAllWindows()
 
     def get_box_score(self):
-        return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box
+        info_dict = {}
+        for attr in dir(self):
+            if not (attr.startswith(("_", 'd', 'g', 'i', 'j', 'r', 'se', 'st', 'n')) or attr.startswith("d")):
+                info_dict[attr] = eval('self.' + attr)
+        return info_dict
 
 
-def main(test_num, confidence, video_record, attack_protect):
+# Maintain queues and warnings method
+class SystemChecking:
+    def __init__(self, query_length, fuse_threshold, init_warnings, log_file):
+        self.fuse_query = []
+        self.warnings = init_warnings
+        self.query_length = query_length + (0 if query_length % 2 else 1)
+        self.fuse_threshold = fuse_threshold
+        self.log_file = log_file
+
+
+def system_run(frame, info_dict, attack_protect):
+    if info_dict['working'] and info_dict['box'] != [0, 0, 1, 1]:
+        frame = query_run(frame, info_dict, attack_protect)
+    else:
+        system_checker.fuse_query = []
+
+    return frame
+
+
+def query_run(frame, info_dict, attack_protect):
+    box = info_dict['box']
+    if info_dict['overflow']:
+        color = (0, 233, 255)
+        result_text = "Faces Exceed Limit"
+        system_checker.fuse_query = []
+        cv2.rectangle(
+            frame,
+            (box[0], box[1]),
+            (box[0] + box[2], box[1] + box[3]),
+            color, 2)
+        for other_box in info_dict['mentioned_box']:
+            cv2.rectangle(
+                frame,
+                (other_box[0], other_box[1]),
+                (other_box[2], other_box[3]),
+                color, 2)
+    else:
+        system_checker.fuse_query.append(1 if info_dict['liveness'] else -1)
+
+        if len(system_checker.fuse_query) > system_checker.query_length:
+            system_checker.fuse_query.pop(0)
+
+        if len(system_checker.fuse_query) == system_checker.query_length:
+            result_text, color, frame = check_conf_sum(frame, info_dict, attack_protect)
+        else:
+            result_text = "Checking..."
+            color = (255, 233, 0)
+            cv2.rectangle(frame,
+                          (box[0], box[1]),
+                          (box[0] + box[2], box[1] + box[3]),
+                          color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
+
+    cv2.putText(frame, result_text, (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
+                cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
+            
+    return frame
+
+
+def system_lock(frame):
+    operation_text = "System Locked"
+    result_text = "Protection for Possible Attack"
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    cv2.putText(
+        frame,
+        result_text,
+        (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
+        cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, (255, 255, 255))
+    cv2.putText(
+        frame,
+        operation_text,
+        (int(0.05 * frame.shape[0]), int(0.2 * frame.shape[1])),
+        cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, (255, 255, 255))
+    
+    return frame
+
+
+def check_conf_sum(frame, info_dict, attack_protect):
+    global ATTACK_WARNING
+    box = info_dict['box']
+    color = (255, 255, 255)
+    result_text = "Too Frequent Operation"
+    if sum(system_checker.fuse_query) >= max(2 * system_checker.query_length * (system_checker.fuse_threshold - 0.5),
+                                             1):
+        result_text = "RealFace Score: {:.2f}".format(info_dict['score'])
+        color = (255, 0, 0)
+        if system_checker.warnings > 0:
+            system_checker.warnings -= 1
+    elif sum(system_checker.fuse_query) <= min(-2 * system_checker.query_length * (system_checker.fuse_threshold - 0.5),
+                                               1):
+        result_text = "FakeFace Score: {:.2f}".format(info_dict['score'])
+        color = (0, 0, 255)
+        if system_checker.warnings > 0:
+            system_checker.warnings -= 1
+    else:
+        if attack_protect:
+            print('!UNNATURAL ENVIRONMENT. ATTACK-WARNING! ' +
+                  time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))
+            system_checker.warnings += 1
+            if system_checker.warnings > np.ceil((1 - system_checker.fuse_threshold) * system_checker.query_length):
+                ATTACK_WARNING = True
+                system_checker.log_file.writelines('A  Attack Warning ' +
+                                                   time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+                system_checker._warnings = 0
+                system_checker.fuse_query = []
+        else:
+            pass
+    cv2.rectangle(
+        frame,
+        (box[0], box[1]),
+        (box[0] + box[2], box[1] + box[3]),
+        color, 2)
+
+    return result_text, color, frame
+
+
+def main(video_record, attack_protect):
     global thread_exit
     global ATTACK_WARNING
-
-    log_f = open('videolog.txt', 'a')
-    log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+    global GLOBAL_COUNTER
 
     # Saving Video by VideoWriter requires legal naming
     if video_record:
@@ -142,27 +244,10 @@ def main(test_num, confidence, video_record, attack_protect):
     else:
         out = None
 
-    # We can use query to further protect face recognition system
-    # When recognition enabled
-    # live_queue = []
-
-    # Better Industrial Logic should be written to minimize CPU usage
-
     thread1 = VideoThread()
     thread2 = DetectThread()
     thread1.start()
     thread2.start()
-
-    progress_display = 0
-    fuse_query = []
-    # Anti-Spoofing multi-test Limit
-    # ONLY ODD NUMBER ACCEPTED --so that 0 is impossible
-    query_length = test_num
-    fuse_threshold = confidence
-    _warnings = 0
-
-    if not query_length % 2:
-        query_length += 1
 
     while not thread_exit:
         thread_lock.acquire()
@@ -170,129 +255,32 @@ def main(test_num, confidence, video_record, attack_protect):
         thread_lock.release()
 
         thread_lock.acquire()
-        box, liveness, score, ret, overflow, mentioned_box = thread2.get_box_score()
+        thread2_info_dict = thread2.get_box_score()
         thread_lock.release()
 
         if not ATTACK_WARNING:
-            if ret and box != [0, 0, 1, 1]:
-                color = (255, 255, 255)
-                result_text = "Too Frequent Operation"
-                if overflow:
-                    color = (0, 233, 255)
-                    result_text = "Faces Exceed Limit"
-                    fuse_query = []
-                else:
-                    if liveness:
-                        fuse_query.append(1)
-                    else:
-                        fuse_query.append(-1)
-
-                    if len(fuse_query) > query_length:
-                        fuse_query.pop(0)
-
-                    if len(fuse_query) == query_length:
-                        if sum(fuse_query) >= 2 * query_length * fuse_threshold - query_length:
-                            result_text = "RealFace Score: {:.2f}".format(score)
-                            color = (255, 0, 0)
-                            if _warnings > 0:
-                                _warnings -= 1
-                        elif sum(fuse_query) <= -2 * query_length * fuse_threshold + query_length:
-                            result_text = "FakeFace Score: {:.2f}".format(score)
-                            color = (0, 0, 255)
-                            if _warnings > 0:
-                                _warnings -= 1
-                        else:
-                            if attack_protect:
-                                print('!UNNATURAL ENVIRONMENT. ATTACK-WARNING! ' +
-                                      time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))
-                                _warnings += 1
-                                if _warnings > (1 - fuse_threshold) * query_length * 2:
-                                    ATTACK_WARNING = True
-                                    log_f.writelines('A  Attack Warning ' +
-                                                     time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
-                                    _warnings = 0
-                                    fuse_query = []
-                            else:
-                                pass
-
-                        cv2.rectangle(
-                            frame,
-                            (box[0], box[1]),
-                            (box[0] + box[2], box[1] + box[3]),
-                            color, 2)
-                    else:
-                        result_text = "Checking..."
-                        color = (255, 233, 0)
-                        cv2.rectangle(
-                            frame,
-                            (box[0], box[1]),
-                            (box[0] + box[2], box[1] + box[3]),
-                            color, int((np.sin(progress_display / 18) + 1) * 6))
-
-                # Show All Face Box
-                if overflow:
-                    cv2.rectangle(
-                        frame,
-                        (box[0], box[1]),
-                        (box[0] + box[2], box[1] + box[3]),
-                        color, 2)
-                    for other_box in mentioned_box:
-                        cv2.rectangle(
-                            frame,
-                            (other_box[0], other_box[1]),
-                            (other_box[2], other_box[3]),
-                            color, 2)
-                # Text Better Shown on the Left Top
-                cv2.putText(
-                    frame,
-                    result_text,
-                    (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
-                    cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
-            else:
-                fuse_query = []
+            frame = system_run(frame, thread2_info_dict, attack_protect)
         else:
-            operation_text = "System Locked"
-            result_text = "Protection for Possible Attack"
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            cv2.putText(
-                frame,
-                result_text,
-                (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
-                cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, (255, 255, 255))
-            cv2.putText(
-                frame,
-                operation_text,
-                (int(0.05 * frame.shape[0]), int(0.2 * frame.shape[1])),
-                cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, (255, 255, 255))
-
-            # Show Text on the detection box, but too small, cannot catch at once
-            ########################################################################
-            # else:                                                                #
-            #     cv2.putText(                                                     #
-            #         frame,                                                       #
-            #         result_text,                                                 #
-            #         (box[0], box[1] - 5),                                        #
-            #         cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 1024, color)#
-            ########################################################################
+            frame = system_lock(frame)
 
         cv2.imshow('Video', frame)
         if video_record:
             out.write(frame)
 
-        progress_display += 1
-        if progress_display > 1e6:
-            progress_display = 0
+        GLOBAL_COUNTER += 1
+        if GLOBAL_COUNTER > 1e6:
+            GLOBAL_COUNTER = 0
 
         if cv2.waitKey(1) & 0xFF == ord('p'):
             ATTACK_WARNING = False
             if attack_protect:
-                log_f.writelines('U  Admin Unlock ' +
-                                 time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+                system_checker.log_file.writelines('U  Admin Unlock ' +
+                                                   time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            log_f.writelines('C  System Close ' +
-                             time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
+            system_checker.log_file.writelines('C  System Close ' +
+                                               time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
             thread_exit = True
-            log_f.close()
+            system_checker.log_file.close()
 
     thread1.join()
     thread2.join()
@@ -300,12 +288,6 @@ def main(test_num, confidence, video_record, attack_protect):
     if video_record:
         out.release()
     cv2.destroyAllWindows()
-
-    ##########################################################################
-    # format_ = os.path.splitext(image_name)[-1]                             #
-    # result_image_name = image_name.replace(format_, "_result" + format_)   #
-    # cv2.imwrite(SAMPLE_IMAGE_PATH + result_image_name, image)              #
-    ##########################################################################
 
 
 if __name__ == "__main__":
@@ -322,4 +304,12 @@ if __name__ == "__main__":
     if not 0 < args.confidence <= 1:
         raise Exception('Confidence {conf} is out of range, expected (0, 1] instead.'.format(conf=args.confidence))
 
-    main(args.number, args.confidence, args.record, args.protect)
+    if args.protect and args.number < 5:
+        print('Protection can hardly work well when testing number is too small, especially 1.')
+
+    log_f = open('videolog.txt', 'a')
+    log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+
+    system_checker = SystemChecking(args.number, args.confidence, 0, log_f)
+
+    main(args.record, args.protect)
