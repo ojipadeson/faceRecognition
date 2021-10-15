@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
     system_checker = SystemChecking(args.number, args.confidence, 0, log_f)
 
-    path = 'Face'
+    path = 'face'
     for file_name in os.listdir(path):
         name_image = face_recognition.load_image_file(path + '/' + file_name)
         name_face_encoding = face_recognition.face_encodings(name_image)[0]
