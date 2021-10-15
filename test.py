@@ -126,7 +126,7 @@ class DetectThread(threading.Thread):
         return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box
 
 
-def main(test_num, video_record):
+def main(test_num, confidence, video_record):
     global thread_exit
     global ATTACK_WARNING
 
@@ -158,7 +158,7 @@ def main(test_num, video_record):
     # Anti-Spoofing multi-test Limit
     # ONLY ODD NUMBER ACCEPTED --so that 0 is impossible
     query_length = test_num
-    fuse_threshold = 0.8
+    fuse_threshold = confidence
     _warnings = 0
 
     if not query_length % 2:
@@ -308,5 +308,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", "--record", help="record the video", action='store_true')
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
+    parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
     args = parser.parse_args()
-    main(args.number, args.record)
+
+    if not 0 < args.number < 200:
+        raise Exception('Number of test {num} is out of range, expected 1~199 instead.'.format(num=args.number))
+
+    if not 0 < args.confidence <= 1:
+        raise Exception('Confidence {conf} is out of range, expected (0, 1] instead.'.format(conf=args.confidence))
+
+    main(args.number, args.confidence, args.record)
