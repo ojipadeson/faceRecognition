@@ -1,7 +1,12 @@
 # faceRecognition
 
 ## 更新日志
-### <日期> <内容>
+### 2021/10/15 
+* 增加多次识别逻辑 -n-c 和录像 -r 和遇到高难度样本的保护机制 -p
+* 简化了main()结构
+* 增加人脸识别模块时，输出位置--check_config_sum()--result_text=...
+* 检测参数全部打包在info_dict内，直接从字典调用即可
+* 注：不要在DetectThread定义’name‘变量，会有冲突
 
 ## Install
 ### 配置环境
@@ -15,6 +20,7 @@ git clone https://github.com/ojipadeson/faceRecognition
 
 ## Work on faceRecognition
 ### 本地修改上传
+* 修改前先pull，保证与当前文件相同
 ```
 # 做修改并将文件归档 (对每一个要修改的文件执行'git add'或执行'git add .'归档所有文件)
 git add <文件名>
@@ -26,9 +32,12 @@ git commit -m "附上的评论"
 git push origin [分支名]
 git push origin master
 ```
-### 添加branch
+### 添加和删除branch
 ```
+# 添加
 git branch [分支名]
+# 删除
+git branch -d [分支名]
 ```
 ### 更新本地
 ```
@@ -36,6 +45,26 @@ git pull https://github.com/ojipadeson/faceRecognition
 ```
 
 ## 运行
+### 按默认运行
 ```
 python test.py
 ```
+### 保存运行录像
+```
+python test.py -r
+```
+### 设置识别逻辑（测试x次(1-199)，超过p(0-1)为真才确认为真)
+```
+python test.py -n [x] -c [p]
+```
+### 启动高难度样本保护
+```
+python test.py -p
+```
+
+## 退出
+* 保持video窗口置顶
+* 按q结束程序
+* 按p推出系统保护（仅-p时有用）
+* 没退出就多按几次
+  
