@@ -8,6 +8,7 @@ import time
 import threading
 import argparse
 from copy import deepcopy
+import face_recognition
 
 from src.anti_spoof_predict import AntiSpoofPredict
 from src.generate_patches import CropImage
@@ -18,6 +19,9 @@ warnings.filterwarnings('ignore')
 
 thread_lock = threading.Lock()
 thread_exit = False
+
+known_face_encodings = []
+known_face_names = []
 
 GLOBAL_COUNTER = 0
 capture = cv2.VideoCapture(0)
@@ -56,10 +60,13 @@ class DetectThread(threading.Thread):
         self.working = False
         self.overflow = False
         self.mentioned_box = []
+        self.rec_name = 'Unknown'
 
     def run(self):
         global thread_exit
         global capture
+        global known_face_names
+        global known_face_encodings
         model_test = AntiSpoofPredict(0)
         image_cropper = CropImage()
 
@@ -77,6 +84,7 @@ class DetectThread(threading.Thread):
                 thread_lock.release()
 
                 if not face_overflow:
+                    img = image
                     prediction = np.zeros((1, 3))
                     test_speed = 0
                     # sum the prediction from single model's result
@@ -103,6 +111,15 @@ class DetectThread(threading.Thread):
                     thread_lock.acquire()
                     self.score = value
                     self.liveness = True if label == 1 else False
+
+                    face_encoding = face_recognition.face_encodings(img)
+                    self.name = 'Unknown'
+                    if len(face_encoding) > 0:
+                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
+                        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
+                        best_match_index = np.argmin(face_distances)
+                        if matches[best_match_index]:
+                            self.name = known_face_names[best_match_index]
                     thread_lock.release()
             else:
                 thread_exit = True
@@ -167,9 +184,10 @@ def query_run(frame, info_dict, attack_protect):
                           (box[0] + box[2], box[1] + box[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
-    cv2.putText(frame, result_text, (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
+    cv2.putText(frame, result_text + ' ' + info_dict['rec_name'],
+                (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
                 cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
-            
+
     return frame
 
 
@@ -187,7 +205,7 @@ def system_lock(frame):
         operation_text,
         (int(0.05 * frame.shape[0]), int(0.2 * frame.shape[1])),
         cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, (255, 255, 255))
-    
+
     return frame
 
 
@@ -311,5 +329,12 @@ if __name__ == "__main__":
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
     system_checker = SystemChecking(args.number, args.confidence, 0, log_f)
+
+    path = 'Face'
+    for file_name in os.listdir(path):
+        name_image = face_recognition.load_image_file(path + '/' + file_name)
+        name_face_encoding = face_recognition.face_encodings(name_image)[0]
+        known_face_encodings.append(name_face_encoding)
+        known_face_names.append(file_name[:-4])
 
     main(args.record, args.protect)
