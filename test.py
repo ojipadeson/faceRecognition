@@ -8,6 +8,7 @@ import time
 import threading
 import argparse
 from copy import deepcopy
+
 import face_recognition
 
 from src.anti_spoof_predict import AntiSpoofPredict
@@ -87,7 +88,6 @@ class DetectThread(threading.Thread):
                     img = image
                     prediction = np.zeros((1, 3))
                     test_speed = 0
-                    # sum the prediction from single model's result
                     for model_name in os.listdir("./resources/anti_spoof_models"):
                         h_input, w_input, model_type, scale = parse_model_name(model_name)
                         param = {
@@ -105,22 +105,22 @@ class DetectThread(threading.Thread):
                         prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
                         test_speed += time.time() - start
 
-                    # draw result of prediction
                     label = np.argmax(prediction)
                     value = prediction[0][label] / 2
                     thread_lock.acquire()
                     self.score = value
                     self.liveness = True if label == 1 else False
+                    thread_lock.release()
 
                     face_encoding = face_recognition.face_encodings(img)
-                    self.name = 'Unknown'
                     if len(face_encoding) > 0:
                         matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
                         face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
                         best_match_index = np.argmin(face_distances)
                         if matches[best_match_index]:
+                            thread_lock.acquire()
                             self.name = known_face_names[best_match_index]
-                    thread_lock.release()
+                            thread_lock.release()
             else:
                 thread_exit = True
 
@@ -253,7 +253,6 @@ def main(video_record, attack_protect):
     global ATTACK_WARNING
     global GLOBAL_COUNTER
 
-    # Saving Video by VideoWriter requires legal naming
     if video_record:
         video_path = 'video/output' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.avi'
         fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
