@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 import time
 import threading
+import argparse
 from copy import deepcopy
 
 from src.anti_spoof_predict import AntiSpoofPredict
@@ -125,7 +126,7 @@ class DetectThread(threading.Thread):
         return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box
 
 
-def main():
+def main(test_num, video_record):
     global thread_exit
     global ATTACK_WARNING
 
@@ -133,10 +134,13 @@ def main():
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
     # Saving Video by VideoWriter requires legal naming
-    video_path = 'video/output' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.avi'
-    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
-    fps = capture.get(cv2.CAP_PROP_FPS)
-    out = cv2.VideoWriter(video_path, fourcc, fps, (int(capture.get(3)), int(capture.get(4))))
+    if video_record:
+        video_path = 'video/output' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.avi'
+        fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        out = cv2.VideoWriter(video_path, fourcc, fps, (int(capture.get(3)), int(capture.get(4))))
+    else:
+        out = None
 
     # We can use query to further protect face recognition system
     # When recognition enabled
@@ -153,7 +157,7 @@ def main():
     fuse_query = []
     # Anti-Spoofing multi-test Limit
     # ONLY ODD NUMBER ACCEPTED --so that 0 is impossible
-    query_length = 13
+    query_length = test_num
     fuse_threshold = 0.8
     _warnings = 0
 
@@ -269,7 +273,8 @@ def main():
             ########################################################################
 
         cv2.imshow('Video', frame)
-        out.write(frame)
+        if video_record:
+            out.write(frame)
 
         progress_display += 1
         if progress_display > 1e6:
@@ -288,7 +293,8 @@ def main():
     thread1.join()
     thread2.join()
     capture.release()
-    out.release()
+    if video_record:
+        out.release()
     cv2.destroyAllWindows()
 
     ##########################################################################
@@ -299,4 +305,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--record", help="record the video", action='store_true')
+    parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
+    args = parser.parse_args()
+    main(args.number, args.record)
