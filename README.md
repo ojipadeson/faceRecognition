@@ -39,6 +39,15 @@ git pull https://github.com/ojipadeson/faceRecognition
 ```
 
 ## 运行
+### 按默认运行
 ```
 python test.py
+```
+### 保存运行录像
+```
+python test.py -r
+```
+### 设置识别逻辑（测试x次，超过80%为真才确认为真)
+```
+python test.py -n [x]
 ```
