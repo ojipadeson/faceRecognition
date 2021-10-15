@@ -6,7 +6,7 @@
 * 简化了main()结构
 * 增加人脸识别模块时，输出位置--check_config_sum()--result_text=...
 * 检测参数全部打包在info_dict内，直接从字典调用即可
-* 注：不要在DetectThread定义’name‘变量，会有冲突
+* 合成了人脸识别部分
 
 ## Install
 ### 配置环境
