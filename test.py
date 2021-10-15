@@ -7,6 +7,7 @@ import warnings
 import time
 import threading
 from copy import deepcopy
+import face_recognition
 
 from src.anti_spoof_predict import AntiSpoofPredict
 from src.generate_patches import CropImage
@@ -56,6 +57,7 @@ class DetectThread(threading.Thread):
         self.working = False
         self.overflow = False
         self.mentioned_box = []
+        self.name = 'Unknown'
 
     def run(self):
         global thread_exit
@@ -114,6 +116,14 @@ class DetectThread(threading.Thread):
                     else:
                         self.liveness = False
                         # print("Is Fake Face. Score: {:.2f}.".format(value))
+                    face_encoding = face_recognition.face_encodings(img)
+                    self.name = 'Unknown'
+                    if len(face_encoding)>0:
+                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0],tolerance=0.6)
+                        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
+                        best_match_index = np.argmin(face_distances)
+                        if matches[best_match_index]:
+                            self.name = known_face_names[best_match_index]
                     thread_lock.release()
                     # print("Prediction cost {:.2f} s".format(test_speed))
             else:
@@ -122,13 +132,22 @@ class DetectThread(threading.Thread):
         # cv2.destroyAllWindows()
 
     def get_box_score(self):
-        return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box
+        return self.box, self.liveness, self.score, self.working, self.overflow, self.mentioned_box, self.name
 
 
 def main():
     global thread_exit
     global ATTACK_WARNING
-
+    global known_face_encodings
+    global known_face_names
+    known_face_encodings=[]
+    known_face_names=[]
+    path = 'Face'
+    for file_name in os.listdir(path):
+        name_image = face_recognition.load_image_file(path+'/'+file_name)
+        name_face_encoding = face_recognition.face_encodings(name_image)[0]
+        known_face_encodings.append(name_face_encoding)
+        known_face_names.append(file_name[:-4])
     log_f = open('videolog.txt', 'a')
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
@@ -166,7 +185,7 @@ def main():
         thread_lock.release()
 
         thread_lock.acquire()
-        box, liveness, score, ret, overflow, mentioned_box = thread2.get_box_score()
+        box, liveness, score, ret, overflow, mentioned_box, name = thread2.get_box_score()
         thread_lock.release()
 
         if not ATTACK_WARNING:
@@ -238,7 +257,7 @@ def main():
                 # Text Better Shown on the Left Top
                 cv2.putText(
                     frame,
-                    result_text,
+                    result_text+' '+name,
                     (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
                     cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
             else:
