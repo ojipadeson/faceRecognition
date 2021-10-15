@@ -65,8 +65,6 @@ class DetectThread(threading.Thread):
     def run(self):
         global thread_exit
         global capture
-        # global known_face_names
-        # global known_face_encodings
         model_test = AntiSpoofPredict(0)
         image_cropper = CropImage()
 
@@ -84,7 +82,6 @@ class DetectThread(threading.Thread):
                 thread_lock.release()
 
                 if not face_overflow:
-                    # img = image
                     prediction = np.zeros((1, 3))
                     for model_name in os.listdir("./resources/anti_spoof_models"):
                         h_input, w_input, model_type, scale = parse_model_name(model_name)
@@ -107,16 +104,6 @@ class DetectThread(threading.Thread):
                     self.score = value
                     self.liveness = True if label == 1 else False
                     thread_lock.release()
-
-                    # face_encoding = face_recognition.face_encodings(img)
-                    # if len(face_encoding) > 0:
-                    #     matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
-                    #     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
-                    #     best_match_index = np.argmin(face_distances)
-                    #     if matches[best_match_index]:
-                    #         thread_lock.acquire()
-                    #         self.name = known_face_names[best_match_index]
-                    #         thread_lock.release()
             else:
                 thread_exit = True
 
