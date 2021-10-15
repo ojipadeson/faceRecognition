@@ -61,13 +61,12 @@ class DetectThread(threading.Thread):
         self.working = False
         self.overflow = False
         self.mentioned_box = []
-        self.rec_name = 'Unknown'
 
     def run(self):
         global thread_exit
         global capture
-        global known_face_names
-        global known_face_encodings
+        # global known_face_names
+        # global known_face_encodings
         model_test = AntiSpoofPredict(0)
         image_cropper = CropImage()
 
@@ -85,9 +84,8 @@ class DetectThread(threading.Thread):
                 thread_lock.release()
 
                 if not face_overflow:
-                    img = image
+                    # img = image
                     prediction = np.zeros((1, 3))
-                    test_speed = 0
                     for model_name in os.listdir("./resources/anti_spoof_models"):
                         h_input, w_input, model_type, scale = parse_model_name(model_name)
                         param = {
@@ -101,9 +99,7 @@ class DetectThread(threading.Thread):
                         if scale is None:
                             param["crop"] = False
                         img = image_cropper.crop(**param)
-                        start = time.time()
                         prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
-                        test_speed += time.time() - start
 
                     label = np.argmax(prediction)
                     value = prediction[0][label] / 2
@@ -112,15 +108,15 @@ class DetectThread(threading.Thread):
                     self.liveness = True if label == 1 else False
                     thread_lock.release()
 
-                    face_encoding = face_recognition.face_encodings(img)
-                    if len(face_encoding) > 0:
-                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
-                        face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
-                        best_match_index = np.argmin(face_distances)
-                        if matches[best_match_index]:
-                            thread_lock.acquire()
-                            self.name = known_face_names[best_match_index]
-                            thread_lock.release()
+                    # face_encoding = face_recognition.face_encodings(img)
+                    # if len(face_encoding) > 0:
+                    #     matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
+                    #     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
+                    #     best_match_index = np.argmin(face_distances)
+                    #     if matches[best_match_index]:
+                    #         thread_lock.acquire()
+                    #         self.name = known_face_names[best_match_index]
+                    #         thread_lock.release()
             else:
                 thread_exit = True
 
@@ -130,6 +126,36 @@ class DetectThread(threading.Thread):
             if not (attr.startswith(("_", 'd', 'g', 'i', 'j', 'r', 'se', 'st', 'n')) or attr.startswith("d")):
                 info_dict[attr] = eval('self.' + attr)
         return info_dict
+
+
+class RecognizeThread(threading.Thread):
+    def __init__(self):
+        super(RecognizeThread, self).__init__()
+        self.face_name = 'Unknown'
+
+    def run(self):
+        global thread_exit
+        global capture
+        global known_face_names
+        global known_face_encodings
+        while not thread_exit:
+            ref, image = capture.read()
+            if ref:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                face_encoding = face_recognition.face_encodings(image)
+                if len(face_encoding) > 0:
+                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
+                    face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
+                    best_match_index = np.argmin(face_distances)
+                    if matches[best_match_index]:
+                        thread_lock.acquire()
+                        self.face_name = known_face_names[best_match_index]
+                        thread_lock.release()
+            else:
+                thread_exit = True
+
+    def get_name(self):
+        return self.face_name
 
 
 # Maintain queues and warnings method
@@ -142,16 +168,16 @@ class SystemChecking:
         self.log_file = log_file
 
 
-def system_run(frame, info_dict, attack_protect):
+def system_run(frame, info_dict, name, attack_protect):
     if info_dict['working'] and info_dict['box'] != [0, 0, 1, 1]:
-        frame = query_run(frame, info_dict, attack_protect)
+        frame = query_run(frame, info_dict, name, attack_protect)
     else:
         system_checker.fuse_query = []
 
     return frame
 
 
-def query_run(frame, info_dict, attack_protect):
+def query_run(frame, info_dict, name, attack_protect):
     box = info_dict['box']
     if info_dict['overflow']:
         color = (0, 233, 255)
@@ -184,7 +210,7 @@ def query_run(frame, info_dict, attack_protect):
                           (box[0] + box[2], box[1] + box[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
-    cv2.putText(frame, result_text + ' ' + info_dict['rec_name'],
+    cv2.putText(frame, result_text + ' ' + name,
                 (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
                 cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
 
@@ -263,6 +289,8 @@ def main(video_record, attack_protect):
 
     thread1 = VideoThread()
     thread2 = DetectThread()
+    thread3 = RecognizeThread()
+    thread3.start()
     thread1.start()
     thread2.start()
 
@@ -275,8 +303,12 @@ def main(video_record, attack_protect):
         thread2_info_dict = thread2.get_box_score()
         thread_lock.release()
 
+        thread_lock.acquire()
+        name = thread3.get_name()
+        thread_lock.release()
+
         if not ATTACK_WARNING:
-            frame = system_run(frame, thread2_info_dict, attack_protect)
+            frame = system_run(frame, thread2_info_dict, name, attack_protect)
         else:
             frame = system_lock(frame)
 
@@ -301,6 +333,7 @@ def main(video_record, attack_protect):
 
     thread1.join()
     thread2.join()
+    thread3.join()
     capture.release()
     if video_record:
         out.release()
