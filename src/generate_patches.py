@@ -44,7 +44,7 @@ class CropImage:
             right_bottom_y = src_h-1
 
         return int(left_top_x), int(left_top_y),\
-               int(right_bottom_x), int(right_bottom_y)
+            int(right_bottom_x), int(right_bottom_y)
 
     def crop(self, org_img, bbox, scale, out_w, out_h, crop=True):
 

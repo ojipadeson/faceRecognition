@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import os
 import cv2
 import numpy as np
@@ -16,10 +15,10 @@ from src.generate_patches import CropImage
 from src.utility import parse_model_name
 warnings.filterwarnings('ignore')
 
-# SAMPLE_IMAGE_PATH = "./images/sample/"
-
 thread_lock = threading.Lock()
 thread_exit = False
+
+event = threading.Event()
 
 known_face_encodings = []
 known_face_names = []
@@ -51,16 +50,18 @@ class VideoThread(threading.Thread):
                 thread_exit = True
 
 
-# Variable 'name' or any name with initial 'n' is not recommanded to define
+# Variables that have the SAME NAME with variables in threading.Thread is NOT recommended to define
+# Startswith "_", 'daemon', 'get', 'i', 'join', 'run', 'set', 'start', 'name'
 class DetectThread(threading.Thread):
     def __init__(self):
         super(DetectThread, self).__init__()
-        self.box = []
+        self.org_bbox = [0] * 4
         self.liveness = 0
         self.score = 0
         self.working = False
         self.overflow = False
         self.mentioned_box = []
+        self._frame = None
 
     def run(self):
         global thread_exit
@@ -75,10 +76,10 @@ class DetectThread(threading.Thread):
                 image_bbox, face_overflow, mentioned_facebox = model_test.get_bbox(image)
 
                 thread_lock.acquire()
-                self.box = image_bbox
+                self._frame = image
+                self.org_bbox = image_bbox
                 self.overflow = face_overflow
                 self.mentioned_box = mentioned_facebox
-                self.working = True
                 thread_lock.release()
 
                 if not face_overflow:
@@ -103,6 +104,7 @@ class DetectThread(threading.Thread):
                     thread_lock.acquire()
                     self.score = value
                     self.liveness = True if label == 1 else False
+                    self.working = True
                     thread_lock.release()
             else:
                 thread_exit = True
@@ -110,9 +112,15 @@ class DetectThread(threading.Thread):
     def get_box_score(self):
         info_dict = {}
         for attr in dir(self):
-            if not (attr.startswith(("_", 'd', 'g', 'i', 'j', 'r', 'se', 'st', 'n')) or attr.startswith("d")):
+            if not (attr.startswith(("_", 'daemon', 'get', 'i', 'join', 'run', 'set', 'start', 'name'))):
                 info_dict[attr] = eval('self.' + attr)
-        return info_dict
+        return info_dict, self._frame, self.org_bbox
+
+
+class ImageInfoShare:
+    def __init__(self):
+        self.image = None
+        self.bbox = [0] * 4
 
 
 class RecognizeThread(threading.Thread):
@@ -125,21 +133,34 @@ class RecognizeThread(threading.Thread):
         global capture
         global known_face_names
         global known_face_encodings
+
+        image_cropper = CropImage()
+
         while not thread_exit:
-            ref, image = capture.read()
-            if ref:
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            event.wait()
+            image = image_share.image
+            if image is not None:
+                image_bbox = image_share.bbox
+                param = {
+                    "org_img": image,
+                    "bbox": image_bbox,
+                    "scale": 1,
+                    "out_w": 80,
+                    "out_h": 80,
+                    "crop": True,
+                }
+                image = image_cropper.crop(**param)
                 face_encoding = face_recognition.face_encodings(image)
                 if len(face_encoding) > 0:
-                    matches = face_recognition.compare_faces(known_face_encodings, face_encoding[0], tolerance=0.6)
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
                     best_match_index = np.argmin(face_distances)
-                    if matches[best_match_index]:
+                    if face_distances[best_match_index] < system_checker.tolerance:
                         thread_lock.acquire()
                         self.face_name = known_face_names[best_match_index]
                         thread_lock.release()
+                event.clear()
             else:
-                thread_exit = True
+                pass
 
     def get_name(self):
         return self.face_name
@@ -147,33 +168,36 @@ class RecognizeThread(threading.Thread):
 
 # Maintain queues and warnings method
 class SystemChecking:
-    def __init__(self, query_length, fuse_threshold, init_warnings, log_file):
+    def __init__(self, query_length, fuse_threshold, tolerance, init_warnings, log_file):
         self.fuse_query = []
         self.warnings = init_warnings
         self.query_length = query_length + (0 if query_length % 2 else 1)
         self.fuse_threshold = fuse_threshold
         self.log_file = log_file
+        self.tolerance = tolerance
+        self.overflow_wait = False
 
 
 def system_run(frame, info_dict, name, attack_protect):
-    if info_dict['working'] and info_dict['box'] != [0, 0, 1, 1]:
+    if info_dict['working'] and info_dict['org_bbox'] != [0, 0, 1, 1]:
         frame = query_run(frame, info_dict, name, attack_protect)
     else:
         system_checker.fuse_query = []
+        event.set()
 
     return frame
 
 
 def query_run(frame, info_dict, name, attack_protect):
-    box = info_dict['box']
+    org_bbox = info_dict['org_bbox']
     if info_dict['overflow']:
         color = (0, 233, 255)
         result_text = "Faces Exceed Limit"
         system_checker.fuse_query = []
         cv2.rectangle(
             frame,
-            (box[0], box[1]),
-            (box[0] + box[2], box[1] + box[3]),
+            (org_bbox[0], org_bbox[1]),
+            (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
             color, 2)
         for other_box in info_dict['mentioned_box']:
             cv2.rectangle(
@@ -181,7 +205,12 @@ def query_run(frame, info_dict, name, attack_protect):
                 (other_box[0], other_box[1]),
                 (other_box[2], other_box[3]),
                 color, 2)
+        system_checker.overflow_wait = True
     else:
+        if system_checker.overflow_wait:
+            event.set()
+            system_checker.overflow_wait = False
+
         system_checker.fuse_query.append(1 if info_dict['liveness'] else -1)
 
         if len(system_checker.fuse_query) > system_checker.query_length:
@@ -189,15 +218,16 @@ def query_run(frame, info_dict, name, attack_protect):
 
         if len(system_checker.fuse_query) == system_checker.query_length:
             result_text, color, frame = check_conf_sum(frame, info_dict, attack_protect)
+            result_text += (' ' + name)
         else:
             result_text = "Checking..."
             color = (255, 233, 0)
             cv2.rectangle(frame,
-                          (box[0], box[1]),
-                          (box[0] + box[2], box[1] + box[3]),
+                          (org_bbox[0], org_bbox[1]),
+                          (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
-    cv2.putText(frame, result_text + ' ' + name,
+    cv2.putText(frame, result_text,
                 (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
                 cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
 
@@ -224,7 +254,7 @@ def system_lock(frame):
 
 def check_conf_sum(frame, info_dict, attack_protect):
     global ATTACK_WARNING
-    box = info_dict['box']
+    org_bbox = info_dict['org_bbox']
     color = (255, 255, 255)
     result_text = "Too Frequent Operation"
     if sum(system_checker.fuse_query) >= max(2 * system_checker.query_length * (system_checker.fuse_threshold - 0.5),
@@ -254,11 +284,17 @@ def check_conf_sum(frame, info_dict, attack_protect):
             pass
     cv2.rectangle(
         frame,
-        (box[0], box[1]),
-        (box[0] + box[2], box[1] + box[3]),
+        (org_bbox[0], org_bbox[1]),
+        (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
         color, 2)
 
     return result_text, color, frame
+
+
+class PerformMonitor:
+    def __init__(self):
+        self.recognition_perform = 0.7
+        self.main_perform = np.inf
 
 
 def main(video_record, attack_protect):
@@ -277,18 +313,27 @@ def main(video_record, attack_protect):
     thread1 = VideoThread()
     thread2 = DetectThread()
     thread3 = RecognizeThread()
-    thread3.start()
     thread1.start()
     thread2.start()
+    thread3.start()
+
+    previous_bbox = np.zeros((4,))
 
     while not thread_exit:
+        loop_start = time.time()
+
         thread_lock.acquire()
         frame = thread1.get_frame()
         thread_lock.release()
 
         thread_lock.acquire()
-        thread2_info_dict = thread2.get_box_score()
+        thread2_info_dict, image_share.image, image_share.bbox = thread2.get_box_score()
         thread_lock.release()
+
+        if np.linalg.norm(np.array(image_share.bbox) - previous_bbox) > 50 or not GLOBAL_COUNTER:
+            event.set()
+
+        previous_bbox = image_share.bbox
 
         thread_lock.acquire()
         name = thread3.get_name()
@@ -299,24 +344,30 @@ def main(video_record, attack_protect):
         else:
             frame = system_lock(frame)
 
-        cv2.imshow('Video', frame)
+        if GLOBAL_COUNTER > 50:
+            cv2.imshow('Video', frame)
         if video_record:
             out.write(frame)
 
         GLOBAL_COUNTER += 1
         if GLOBAL_COUNTER > 1e6:
-            GLOBAL_COUNTER = 0
+            GLOBAL_COUNTER = 100
 
         if cv2.waitKey(1) & 0xFF == ord('p'):
             ATTACK_WARNING = False
             if attack_protect:
                 system_checker.log_file.writelines('U  Admin Unlock ' +
                                                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+            event.set()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             system_checker.log_file.writelines('C  System Close ' +
                                                time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
             thread_exit = True
+            event.set()
             system_checker.log_file.close()
+
+        loop_end = time.time()
+        monitor.main_perform = loop_end - loop_start
 
     thread1.join()
     thread2.join()
@@ -333,6 +384,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--protect", help="protect system from difficult samples", action='store_true')
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
     parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
+    parser.add_argument("-t", "--tolerance", type=float, default=0.6, help="tolerance for minimal face distance")
     args = parser.parse_args()
 
     if not 0 < args.number < 200:
@@ -347,13 +399,21 @@ if __name__ == "__main__":
     log_f = open('videolog.txt', 'a')
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
-    system_checker = SystemChecking(args.number, args.confidence, 0, log_f)
+    system_checker = SystemChecking(args.number, args.confidence, args.tolerance, 0, log_f)
 
-    path = 'face'
+    model_for_faces = AntiSpoofPredict(0)
+    cropper_for_faces = CropImage()
+
+    path = 'face_box'
     for file_name in os.listdir(path):
-        name_image = face_recognition.load_image_file(path + '/' + file_name)
+        name_image = cv2.imread(path + '/' + file_name)
+        name_image = cv2.cvtColor(name_image, cv2.COLOR_BGR2RGB)
         name_face_encoding = face_recognition.face_encodings(name_image)[0]
+
         known_face_encodings.append(name_face_encoding)
         known_face_names.append(file_name[:-4])
+
+    image_share = ImageInfoShare()
+    monitor = PerformMonitor()
 
     main(args.record, args.protect)
