@@ -47,7 +47,7 @@ class TrainMain:
         running_acc = 0.
         running_loss_cls = 0.
         running_loss_ft = 0.
-        is_first = True
+        is_first = False
         for e in range(self.start_epoch, self.conf.epochs):
             if is_first:
                 self.writer = SummaryWriter(self.conf.log_path)
@@ -69,20 +69,25 @@ class TrainMain:
 
                 if self.step % self.board_loss_every == 0 and self.step != 0:
                     loss_board = running_loss / self.board_loss_every
-                    self.writer.add_scalar(
-                        'Training/Loss', loss_board, self.step)
+                    print('\nloss', loss_board, self.step)
+                    # self.writer.add_scalar(
+                    #     'Training/Loss', loss_board, self.step)
                     acc_board = running_acc / self.board_loss_every
-                    self.writer.add_scalar(
-                        'Training/Acc', acc_board, self.step)
-                    lr = self.optimizer.param_groups[0]['lr']
-                    self.writer.add_scalar(
-                        'Training/Learning_rate', lr, self.step)
-                    loss_cls_board = running_loss_cls / self.board_loss_every
-                    self.writer.add_scalar(
-                        'Training/Loss_cls', loss_cls_board, self.step)
-                    loss_ft_board = running_loss_ft / self.board_loss_every
-                    self.writer.add_scalar(
-                        'Training/Loss_ft', loss_ft_board, self.step)
+                    print('acc:', acc_board, self.step)
+                    # self.writer.add_scalar(
+                    #     'Training/Acc', acc_board, self.step)
+                    # lr = self.optimizer.param_groups[0]['lr']
+                    # print(lr, self.step)
+                    # self.writer.add_scalar(
+                    #     'Training/Learning_rate', lr, self.step)
+                    # loss_cls_board = running_loss_cls / self.board_loss_every
+                    # print(loss_cls_board, self.step)
+                    # self.writer.add_scalar(
+                    #     'Training/Loss_cls', loss_cls_board, self.step)
+                    # loss_ft_board = running_loss_ft / self.board_loss_every
+                    # print(loss_ft_board, self.step)
+                    # self.writer.add_scalar(
+                    #     'Training/Loss_ft', loss_ft_board, self.step)
 
                     running_loss = 0.
                     running_acc = 0.
@@ -95,7 +100,7 @@ class TrainMain:
 
         time_stamp = get_time()
         self._save_state(time_stamp, extra=self.conf.job_name)
-        self.writer.close()
+        # self.writer.close()
 
     def _train_batch_data(self, imgs, labels):
         self.optimizer.zero_grad()

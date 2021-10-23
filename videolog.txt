@@ -1,0 +1,69 @@
+S  System Start 2021-10-22 15:12:44
+C  System Close 2021-10-22 15:14:41
+
+S  System Start 2021-10-23 04:25:13
+C  System Close 2021-10-23 04:26:13
+
+S  System Start 2021-10-23 04:28:11
+C  System Close 2021-10-23 04:29:22
+
+S  System Start 2021-10-23 04:30:21
+C  System Close 2021-10-23 04:32:48
+
+S  System Start 2021-10-23 04:34:56
+C  System Close 2021-10-23 04:35:43
+
+S  System Start 2021-10-23 04:35:52
+C  System Close 2021-10-23 04:36:11
+
+S  System Start 2021-10-23 04:36:28
+C  System Close 2021-10-23 04:37:41
+
+S  System Start 2021-10-23 05:00:59
+C  System Close 2021-10-23 05:03:56
+
+S  System Start 2021-10-23 05:04:21
+C  System Close 2021-10-23 05:05:01
+
+S  System Start 2021-10-23 05:09:57
+C  System Close 2021-10-23 05:10:31
+
+S  System Start 2021-10-23 06:13:21
+C  System Close 2021-10-23 06:15:17
+
+S  System Start 2021-10-23 06:23:38
+C  System Close 2021-10-23 06:24:36
+
+S  System Start 2021-10-23 06:30:59
+C  System Close 2021-10-23 06:33:14
+
+S  System Start 2021-10-23 06:33:23
+C  System Close 2021-10-23 06:35:16
+
+S  System Start 2021-10-23 06:38:25
+C  System Close 2021-10-23 06:40:06
+
+S  System Start 2021-10-23 06:40:14
+C  System Close 2021-10-23 06:41:39
+
+S  System Start 2021-10-23 06:41:56
+C  System Close 2021-10-23 06:42:27
+
+S  System Start 2021-10-23 06:42:38
+C  System Close 2021-10-23 06:43:13
+
+S  System Start 2021-10-23 06:43:25
+C  System Close 2021-10-23 06:44:16
+
+S  System Start 2021-10-23 06:44:29
+C  System Close 2021-10-23 06:45:18
+
+S  System Start 2021-10-23 06:46:50
+C  System Close 2021-10-23 06:47:28
+
+S  System Start 2021-10-23 06:49:38
+C  System Close 2021-10-23 06:50:17
+
+S  System Start 2021-10-23 06:50:34
+C  System Close 2021-10-23 06:53:05
+

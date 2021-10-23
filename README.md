@@ -14,6 +14,11 @@
   ```
 * 更新了人脸识别模型的使用逻辑，大大提高系统流畅度
 * 优化了线程调度逻辑，解决了一些不能退出的bug
+### 2021/10/23
+* 由于在Jetson上pytorch似乎有性能瓶颈，单独为anti-spoofing增加了一个线程
+* 优化了线程间变量调用，全部使用ImageInfoShare类
+* 更新了人脸识别模型的使用逻辑，适配Jetson
+* train_main revision
 ## Install
 ### 配置环境
 ```
