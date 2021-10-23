@@ -371,7 +371,7 @@ def main(video_record, attack_protect):
 
         if np.linalg.norm(np.array(image_share.bbox) - previous_bbox) > 40.0\
                 or not GLOBAL_COUNTER or image_share.name == 'Unknown' or \
-                not GLOBAL_COUNTER % int(1 + 3.0 / monitor.main_perform):
+                not GLOBAL_COUNTER % int(1 + 5.0 / monitor.main_perform):
             event.set()
 
         previous_bbox = image_share.bbox
