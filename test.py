@@ -150,7 +150,7 @@ class AntiSpoofingThread(threading.Thread):
 class RecognizeThread(threading.Thread):
     def __init__(self):
         super(RecognizeThread, self).__init__()
-        self.face_name = 'Unknown'
+        self.face_name = 'Unknown00'
 
     def run(self):
         global thread_exit
@@ -245,7 +245,7 @@ def query_run(frame, attack_protect):
 
         if len(system_checker.fuse_query) == system_checker.query_length:
             result_text, color, frame = check_conf_sum(frame, attack_protect)
-            result_text += (' ' + image_share.name)
+            result_text += (' ' + image_share.name[:-2])
         else:
             result_text = "Checking..."
             color = (255, 233, 0)
@@ -370,7 +370,7 @@ def main(video_record, attack_protect):
         thread_lock.release()
 
         if np.linalg.norm(np.array(image_share.bbox) - previous_bbox) > 40.0\
-                or not GLOBAL_COUNTER or image_share.name == 'Unknown' or \
+                or not GLOBAL_COUNTER or image_share.name == 'Unknown00' or \
                 not GLOBAL_COUNTER % int(1 + 5.0 / monitor.main_perform):
             event.set()
 
