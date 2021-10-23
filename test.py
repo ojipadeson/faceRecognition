@@ -447,10 +447,12 @@ if __name__ == "__main__":
     for file_name in os.listdir(path):
         name_image = cv2.imread(path + '/' + file_name)
         name_image = cv2.cvtColor(name_image, cv2.COLOR_BGR2RGB)
-        name_face_encoding = face_recognition.face_encodings(name_image)[0]
-
-        known_face_encodings.append(name_face_encoding)
-        known_face_names.append(file_name[:-4])
+        try:
+            name_face_encoding = face_recognition.face_encodings(name_image)[0]
+            known_face_encodings.append(name_face_encoding)
+            known_face_names.append(file_name[:-4])
+        except IndexError:
+            print(file_name, 'Not Explicit Face.')
 
     image_share = ImageInfoShare()
     monitor = PerformMonitor()
