@@ -6,6 +6,7 @@ import math
 import torch
 import numpy as np
 import torch.nn.functional as F
+import platform
 
 
 from src.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2,MiniFASNetV1SE,MiniFASNetV2SE
@@ -93,6 +94,9 @@ class AntiSpoofPredict(Detection):
         img = img.unsqueeze(0).to(self.device)
         self._load_model(model_path)
         self.model.eval()
+        if platform.machine() != 'AMD64':
+            from torch2trt import torch2trt
+            self.model = torch2trt(self.model, [img])
         with torch.no_grad():
             result = self.model.forward(img)
             result = F.softmax(result).cpu().numpy()
