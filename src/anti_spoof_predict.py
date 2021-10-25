@@ -3,21 +3,23 @@
 import os
 import cv2
 import math
+import time
 import torch
 import numpy as np
 import torch.nn.functional as F
-import platform
+import torch.onnx
+import onnxruntime
 
 
-from src.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2,MiniFASNetV1SE,MiniFASNetV2SE
+from src.model_lib.MiniFASNet import MiniFASNetV1, MiniFASNetV2, MiniFASNetV1SE, MiniFASNetV2SE
 from src.data_io import transform as trans
 from src.utility import get_kernel, parse_model_name
 
 MODEL_MAPPING = {
     'MiniFASNetV1': MiniFASNetV1,
     'MiniFASNetV2': MiniFASNetV2,
-    'MiniFASNetV1SE':MiniFASNetV1SE,
-    'MiniFASNetV2SE':MiniFASNetV2SE
+    'MiniFASNetV1SE': MiniFASNetV1SE,
+    'MiniFASNetV2SE': MiniFASNetV2SE
 }
 
 
@@ -53,7 +55,7 @@ class Detection:
                                           int(out[index, 5]*width), int(out[index, 6]*height)])
 
         left, top, right, bottom = out[max_conf_index, 3]*width, out[max_conf_index, 4]*height, \
-                                   out[max_conf_index, 5]*width, out[max_conf_index, 6]*height
+            out[max_conf_index, 5]*width, out[max_conf_index, 6]*height
         bbox = [int(left), int(top), int(right-left+1), int(bottom-top+1)]
         return bbox, face_overflow, mentioned_facebox
 
@@ -63,6 +65,8 @@ class AntiSpoofPredict(Detection):
         super(AntiSpoofPredict, self).__init__()
         self.device = torch.device("cuda:{}".format(device_id)
                                    if torch.cuda.is_available() else "cpu")
+        self.onnx_session_1 = onnxruntime.InferenceSession("Anti-Spoof_078.onnx")
+        self.onnx_session_2 = onnxruntime.InferenceSession("Anti-Spoof_943.onnx")
 
     def _load_model(self, model_path):
         # define model
@@ -94,21 +98,55 @@ class AntiSpoofPredict(Detection):
         img = img.unsqueeze(0).to(self.device)
         self._load_model(model_path)
         self.model.eval()
-        if platform.machine() != 'AMD64':
-            from torch2trt import torch2trt
-            self.model = torch2trt(self.model, [img])
         with torch.no_grad():
             result = self.model.forward(img)
             result = F.softmax(result).cpu().numpy()
         return result
 
+    def predict_onnx(self, img, model_no):
+        test_transform = trans.Compose([
+            trans.ToTensor(),
+        ])
+        img = test_transform(img)
+        img = img.unsqueeze(0).to(self.device)
+        if model_no is not 1:
+            ort_inputs = {self.onnx_session_1.get_inputs()[0].name: self.to_numpy(img)}
+            ort_outs = self.onnx_session_1.run(None, ort_inputs)
+        else:
+            ort_inputs = {self.onnx_session_2.get_inputs()[0].name: self.to_numpy(img)}
+            ort_outs = self.onnx_session_2.run(None, ort_inputs)
+        result = F.softmax(test_transform(ort_outs[0]).squeeze()).cpu().numpy()
+        return result
 
+    def convert_onnx(self, img, model_path):
+        # set the model to inference mode
+        self._load_model(model_path)
+        self.model.eval()
 
+        test_transform = trans.Compose([
+            trans.ToTensor(),
+        ])
+        img = test_transform(img)
+        img = img.unsqueeze(0).to(self.device)
+        # print(img.shape)
 
+        # Let's create a dummy input tensor
+        dummy_input = torch.randn(img.shape, requires_grad=True)
 
+        # Export the model
+        torch.onnx.export(self.model,  # model being run
+                          dummy_input,  # model input (or a tuple for multiple inputs)
+                          f"Anti-Spoof_{str(time.time())[-3:]}.onnx",  # where to save the model
+                          export_params=True,  # store the trained parameter weights inside the model file
+                          opset_version=10,  # the ONNX version to export the model to
+                          do_constant_folding=True,  # whether to execute constant folding for optimization
+                          input_names=['modelInput'],  # the model's input names
+                          output_names=['modelOutput'],  # the model's output names
+                          dynamic_axes={'modelInput': {0: 'batch_size'},  # variable length axes
+                                        'modelOutput': {0: 'batch_size'}})
+        print(" ")
+        print('Model has been converted to ONNX')
 
-
-
-
-
-
+    @staticmethod
+    def to_numpy(tensor):
+        return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()

@@ -12,7 +12,7 @@ import face_recognition
 
 from src.anti_spoof_predict import AntiSpoofPredict
 from src.generate_patches import CropImage
-from src.utility import parse_model_name
+from src.utility import parse_model_name, display_fps
 warnings.filterwarnings('ignore')
 
 thread_lock = threading.Lock()
@@ -120,6 +120,7 @@ class AntiSpoofingThread(threading.Thread):
 
             if image is not None and not image_share.overflow and image_share.bbox != [0, 0, 1, 1]:
                 prediction = np.zeros((1, 3))
+                count = 1
                 for model_name in os.listdir("./resources/anti_spoof_models"):
                     h_input, w_input, model_type, scale = parse_model_name(model_name)
                     param = {
@@ -133,10 +134,11 @@ class AntiSpoofingThread(threading.Thread):
                     if scale is None:
                         param["crop"] = False
                     img = image_cropper.crop(**param)
-                    start = time.time()
-                    prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
-                    end = time.time()
-                    print(end - start)
+                    # start = time.time()
+                    # prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
+                    prediction += model_test.predict_onnx(img, count)
+                    count += 1
+                    # end = time.time()
 
                 label = np.argmax(prediction)
                 value = prediction[0][label] / 2
@@ -327,7 +329,7 @@ class PerformMonitor:
         self.main_perform = np.inf
 
 
-def main(video_record, attack_protect):
+def main(video_record, attack_protect, show_fps):
     global thread_exit
     global ATTACK_WARNING
     global GLOBAL_COUNTER
@@ -350,6 +352,8 @@ def main(video_record, attack_protect):
     thread4.start()
 
     previous_bbox = np.zeros((4,))
+    previous_time = time.time()
+    fps = 0.0
 
     while not thread_exit:
         loop_start = time.time()
@@ -384,6 +388,16 @@ def main(video_record, attack_protect):
         else:
             frame = system_lock(frame)
 
+        if show_fps:
+            if not (GLOBAL_COUNTER + 1) % 2:
+                multi_frame_time = time.time()
+                fps = 2.0 / (multi_frame_time - previous_time)
+                fps_f.writelines(str(time.time()) + ' ' + str(fps) + '\n')
+                previous_time = time.time()
+            cv2.putText(frame, f"FPS {fps}",
+                        (int(0.9 * frame.shape[0]), int(0.05 * frame.shape[1])),
+                        cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
+
         if GLOBAL_COUNTER > 50:
             cv2.imshow('Video', frame)
         if video_record:
@@ -405,6 +419,9 @@ def main(video_record, attack_protect):
             thread_exit = True
             event.set()
             system_checker.log_file.close()
+            if show_fps:
+                fps_f.truncate()
+                fps_f.close()
 
         loop_end = time.time()
         monitor.main_perform = loop_end - loop_start
@@ -426,6 +443,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
     parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
     parser.add_argument("-t", "--tolerance", type=float, default=0.4, help="tolerance for minimal face distance")
+    parser.add_argument("-f", "--fps", help="record frame rate", action='store_true')
     args = parser.parse_args()
 
     if not 0 < args.number < 200:
@@ -439,6 +457,10 @@ if __name__ == "__main__":
 
     log_f = open('videolog.txt', 'a')
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
+
+    if args.fps:
+        fps_f = open('f_log.txt', 'a')
+        fps_f.seek(0)
 
     system_checker = SystemChecking(args.number, args.confidence, args.tolerance, 0, log_f)
 
@@ -460,4 +482,6 @@ if __name__ == "__main__":
     image_share = ImageInfoShare()
     monitor = PerformMonitor()
 
-    main(args.record, args.protect)
+    main(args.record, args.protect, args.fps)
+
+    display_fps('f_log.txt')
