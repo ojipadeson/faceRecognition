@@ -86,7 +86,10 @@ class DetectThread(threading.Thread):
             ref, image = capture.read()
             if ref:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                start = time.time()
                 image_bbox, face_overflow, mentioned_facebox = model_test.get_bbox(image)
+                end = time.time()
+                print('Detect: ', end - start)
 
                 thread_lock.acquire()
                 self._frame = image
@@ -139,7 +142,7 @@ class AntiSpoofingThread(threading.Thread):
                     prediction += model_test.predict_onnx(img, count)
                     count += 1
                     end = time.time()
-                    print(end - start)
+                    print('Anti-Spoof: ', end - start)
                 label = np.argmax(prediction)
                 value = prediction[0][label] / 2
                 thread_lock.acquire()
