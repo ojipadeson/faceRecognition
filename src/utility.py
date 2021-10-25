@@ -53,6 +53,6 @@ def display_fps(file_path):
         line = fps_file.readline()
     plt.plot(x_time, y_fps)
     plt.xticks(np.linspace(x_time[0], x_time[-1], 10), np.linspace(0, 9, 10))
-    plt.yticks(np.linspace(0, 80, 10))
+    plt.yticks(np.linspace(int(min(y_fps)) - 20, int(max(y_fps)) + 10, 10))
     plt.show()
     fps_file.close()

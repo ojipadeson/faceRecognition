@@ -134,12 +134,12 @@ class AntiSpoofingThread(threading.Thread):
                     if scale is None:
                         param["crop"] = False
                     img = image_cropper.crop(**param)
-                    # start = time.time()
+                    start = time.time()
                     # prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
                     prediction += model_test.predict_onnx(img, count)
                     count += 1
-                    # end = time.time()
-
+                    end = time.time()
+                    print(end - start)
                 label = np.argmax(prediction)
                 value = prediction[0][label] / 2
                 thread_lock.acquire()
