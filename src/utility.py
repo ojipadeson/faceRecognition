@@ -57,7 +57,7 @@ def display_fps(file_path, fps_limit, redundant_time):
     avg_fps = (1 + len(x_time) * 2) / (x_time[-1] - x_time[0] - len(x_time) * redundant_time)
     plt.figure(figsize=(48, 8))
     try:
-        plt.style.use('./myclassic.mplstyle')
+        plt.style.use('./resources/mplstyle/myclassic.mplstyle')
     except OSError:
         print('Plotting Style not Found. Please follow the Readme.md to get style available')
         return

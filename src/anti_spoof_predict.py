@@ -65,8 +65,8 @@ class AntiSpoofPredict(Detection):
         super(AntiSpoofPredict, self).__init__()
         self.device = torch.device("cuda:{}".format(device_id)
                                    if torch.cuda.is_available() else "cpu")
-        self.onnx_session_1 = onnxruntime.InferenceSession("Anti-Spoof_078.onnx")
-        self.onnx_session_2 = onnxruntime.InferenceSession("Anti-Spoof_943.onnx")
+        self.onnx_session_1 = onnxruntime.InferenceSession("./resources/onnx_models/Anti-Spoof_078.onnx")
+        self.onnx_session_2 = onnxruntime.InferenceSession("./resources/onnx_models/Anti-Spoof_943.onnx")
 
     def _load_model(self, model_path):
         # define model

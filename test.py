@@ -409,7 +409,7 @@ def main(video_record, attack_protect, show_fps):
         thread_lock.release()
 
         current_bbox = image_share.bbox
-        if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 15.0
+        if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 25.0
                 or (not GLOBAL_COUNTER) or (image_share.name == 'Unknown00') or
                 (not GLOBAL_COUNTER % int(6.0 + CAM_FPS))) and current_bbox != [0, 0, 1, 1]:
             event.set()
@@ -491,12 +491,12 @@ if __name__ == "__main__":
     if args.protect and args.number < 5:
         print('Protection can hardly work well when testing number is too small, especially 1.')
 
-    log_f = open('videolog.txt', 'a')
+    log_f = open('./monitor_log/videolog.txt', 'a')
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
     if args.fps:
-        open('f_log.txt', 'w').close()
-        fps_f = open('f_log.txt', 'a')
+        open('./monitor_log/f_log.txt', 'w').close()
+        fps_f = open('./monitor_log/f_log.txt', 'a')
 
     system_checker = SystemChecking(args.number, args.confidence, args.tolerance, 0, log_f)
 
@@ -529,4 +529,4 @@ if __name__ == "__main__":
               + ' | Main: %.4f\n\n' % (monitor.main_perform / 4.0))
 
     if args.fps:
-        display_fps('f_log.txt', CAM_FPS, monitor.writing_time)
+        display_fps('./monitor_log/f_log.txt', CAM_FPS, monitor.writing_time)
