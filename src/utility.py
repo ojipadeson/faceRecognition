@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def get_time():
@@ -38,8 +39,7 @@ def make_if_not_exist(folder_path):
         os.makedirs(folder_path)
 
 
-def display_fps(file_path):
-    import matplotlib.pyplot as plt
+def display_fps(file_path, fps_limit, redundant_time):
     x_time = []
     y_fps = []
     fps_file = open(file_path, 'r')
@@ -51,8 +51,25 @@ def display_fps(file_path):
         x_time.append(float(timestamp))
         y_fps.append(float(fps))
         line = fps_file.readline()
-    plt.plot(x_time, y_fps)
+
+    x_time = x_time[5:-5]
+    y_fps = y_fps[5:-5]
+    avg_fps = (1 + len(x_time) * 2) / (x_time[-1] - x_time[0] - len(x_time) * redundant_time)
+    plt.figure(figsize=(48, 8))
+    try:
+        plt.style.use('./myclassic.mplstyle')
+    except OSError:
+        print('Plotting Style not Found. Please follow the Readme.md to get style available')
+        return
+    plt.plot(x_time, y_fps, color='b', label='real-time fps')
+    plt.axhline(y=avg_fps, color='g', linewidth=3.5, label='average fps')
+    plt.axhline(y=fps_limit, color='r', linewidth=3.5, label='camera fps')
     plt.xticks(np.linspace(x_time[0], x_time[-1], 10), np.linspace(0, 9, 10))
-    plt.yticks(np.linspace(int(min(y_fps)) - 20, int(max(y_fps)) + 10, 10))
+    plt.yticks(np.sort(np.append(np.linspace(max(0, int(min(y_fps)) - 20), fps_limit + 5, 2),
+                                 (avg_fps, fps_limit))))
+    plt.xlabel('Running Time: %.2f (s)' % (x_time[-1] - x_time[0]))
+    plt.ylabel('FPS')
+    plt.title('Frame Rate')
+    plt.legend()
     plt.show()
     fps_file.close()

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+
 import cv2
 import numpy as np
 import warnings
@@ -31,6 +32,7 @@ if capture.isOpened():
 else:
     raise Exception('Cannot Open Camera.')
 
+CAM_FPS = capture.get(cv2.CAP_PROP_FPS)
 ATTACK_WARNING = False
 
 
@@ -58,41 +60,42 @@ class VideoThread(threading.Thread):
 class ImageInfoShare:
     def __init__(self):
         self.image = None
-        self.bbox = [0] * 4
+        self.bbox = [0, 0, 1, 1]
         self.overflow = False
         self.mentioned_box = None
         self.working = False
         self.liveness = False
         self.score = 0
-        self.antispoof_work = False
-        self.name = 'Unknown'
+        self.antispoof_work = 0
+        self.name = 'Unknown00'
 
 
 class DetectThread(threading.Thread):
     def __init__(self):
         super(DetectThread, self).__init__()
-        self.org_bbox = [0] * 4
+        self.org_bbox = [0, 0, 1, 1]
         self.overflow = False
         self.mentioned_box = []
-        self._frame = None
         self.working = False
 
     def run(self):
         global thread_exit
         global capture
+        global MONITOR_ON
         model_test = AntiSpoofPredict(0)
 
         while not thread_exit:
-            ref, image = capture.read()
-            if ref:
+            image = image_share.image
+            if image is not None:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 start = time.time()
                 image_bbox, face_overflow, mentioned_facebox = model_test.get_bbox(image)
-                end = time.time()
-                print('Detect: ', end - start)
+                if MONITOR_ON:
+                    end = time.time()
+                    monitor.detect_perform += (end - start)
+                    monitor.thread_calls[0] += 1
 
                 thread_lock.acquire()
-                self._frame = image
                 self.org_bbox = image_bbox
                 self.overflow = face_overflow
                 self.mentioned_box = mentioned_facebox
@@ -102,7 +105,7 @@ class DetectThread(threading.Thread):
                 thread_exit = True
 
     def get_box_score(self):
-        return self.org_bbox, self.overflow, self.mentioned_box, self._frame, self.working
+        return self.org_bbox, self.overflow, self.mentioned_box, self.working
 
 
 class AntiSpoofingThread(threading.Thread):
@@ -118,38 +121,43 @@ class AntiSpoofingThread(threading.Thread):
         model_test = AntiSpoofPredict(0)
         image_cropper = CropImage()
         while not thread_exit:
-            image = image_share.image
-            image_bbox = image_share.bbox
+            if image_share.bbox is not [0, 0, 1, 1]:
+                # large amount of this kind will slow down the performance
+                image = image_share.image
+                image_bbox = image_share.bbox
 
-            if image is not None and not image_share.overflow and image_share.bbox != [0, 0, 1, 1]:
-                prediction = np.zeros((1, 3))
-                count = 1
-                for model_name in os.listdir("./resources/anti_spoof_models"):
-                    h_input, w_input, model_type, scale = parse_model_name(model_name)
-                    param = {
-                        "org_img": image,
-                        "bbox": image_bbox,
-                        "scale": scale,
-                        "out_w": w_input,
-                        "out_h": h_input,
-                        "crop": True,
-                    }
-                    if scale is None:
-                        param["crop"] = False
-                    img = image_cropper.crop(**param)
+                if image is not None:
+                    prediction = np.zeros((1, 3))
+                    model_count = 1
                     start = time.time()
-                    # prediction += model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
-                    prediction += model_test.predict_onnx(img, count)
-                    count += 1
-                    end = time.time()
-                    print('Anti-Spoof: ', end - start)
-                label = np.argmax(prediction)
-                value = prediction[0][label] / 2
-                thread_lock.acquire()
-                self.score = value
-                self.liveness = True if label == 1 else False
-                self.working = time.time()
-                thread_lock.release()
+                    for model_name in os.listdir("./resources/anti_spoof_models"):
+                        h_input, w_input, model_type, scale = parse_model_name(model_name)
+                        param = {
+                            "org_img": image,
+                            "bbox": image_bbox,
+                            "scale": scale,
+                            "out_w": w_input,
+                            "out_h": h_input,
+                            "crop": True,
+                        }
+                        if scale is None:
+                            param["crop"] = False
+                        img = image_cropper.crop(**param)
+                        # prediction +=
+                        # model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
+                        prediction += model_test.predict_onnx(img, model_count)
+                        model_count += 1
+                    if MONITOR_ON:
+                        end = time.time()
+                        monitor.anti_spoof_perform += (end - start)
+                        monitor.thread_calls[1] += 1
+                    label = np.argmax(prediction)
+                    value = prediction[0][label] / 2
+                    thread_lock.acquire()
+                    self.score = value
+                    self.liveness = True if label == 1 else False
+                    self.working = time.time()
+                    thread_lock.release()
 
     def get_liveness(self):
         return self.liveness, self.score, self.working
@@ -182,13 +190,22 @@ class RecognizeThread(threading.Thread):
                     "crop": True,
                 }
                 image = image_cropper.crop(**param)
+                start = time.time()
                 face_encoding = face_recognition.face_encodings(image)
+                if MONITOR_ON:
+                    end = time.time()
+                    monitor.recognize_perform += (end - start)
+                    monitor.thread_calls[2] += 1
                 if len(face_encoding) > 0:
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
                     best_match_index = np.argmin(face_distances)
                     if face_distances[best_match_index] < system_checker.tolerance:
                         thread_lock.acquire()
                         self.face_name = known_face_names[best_match_index]
+                        thread_lock.release()
+                    else:
+                        thread_lock.acquire()
+                        self.face_name = 'Unknown00'
                         thread_lock.release()
                 event.clear()
             else:
@@ -208,15 +225,19 @@ class SystemChecking:
         self.log_file = log_file
         self.tolerance = tolerance
         self.overflow_wait = False
+        self.blank_to_man = True
         self.antispoof_checker = 0
 
 
 def system_run(frame, attack_protect):
     if image_share.working and image_share.bbox != [0, 0, 1, 1]:
+        if system_checker.blank_to_man:
+            event.set()
+            system_checker.blank_to_man = False
         frame = query_run(frame, attack_protect)
     else:
         system_checker.fuse_query = []
-        event.set()
+        system_checker.blank_to_man = True
 
     return frame
 
@@ -329,19 +350,26 @@ def check_conf_sum(frame, attack_protect):
 class PerformMonitor:
     def __init__(self):
         self.recognition_perform = 0.7
-        self.main_perform = np.inf
+        self.main_perform = 0.0
+        self.anti_spoof_perform = 0.0
+        self.detect_perform = 0.0
+        self.recognize_perform = 0.0
+        self.writing_time = 0.0
+        # Detect -- Anti-spoof -- Recognize
+        self.thread_calls = [0] * 3
 
 
 def main(video_record, attack_protect, show_fps):
     global thread_exit
     global ATTACK_WARNING
     global GLOBAL_COUNTER
+    global CAM_FPS
+    global MONITOR_ON
 
     if video_record:
         video_path = 'video/output' + time.strftime('%Y%m%d_%H%M%S', time.gmtime()) + '.avi'
         fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
-        fps = capture.get(cv2.CAP_PROP_FPS)
-        out = cv2.VideoWriter(video_path, fourcc, fps, (int(capture.get(3)), int(capture.get(4))))
+        out = cv2.VideoWriter(video_path, fourcc, CAM_FPS, (int(capture.get(3)), int(capture.get(4))))
     else:
         out = None
 
@@ -363,11 +391,12 @@ def main(video_record, attack_protect, show_fps):
 
         thread_lock.acquire()
         frame = thread1.get_frame()
+        image_share.image = frame
         thread_lock.release()
 
         thread_lock.acquire()
         image_share.bbox, image_share.overflow, \
-            image_share.mentioned_box, image_share.image, \
+            image_share.mentioned_box, \
             image_share.working = thread2.get_box_score()
         thread_lock.release()
 
@@ -379,9 +408,10 @@ def main(video_record, attack_protect, show_fps):
         image_share.name = thread3.get_name()
         thread_lock.release()
 
-        if np.linalg.norm(np.array(image_share.bbox) - previous_bbox) > 40.0\
-                or not GLOBAL_COUNTER or image_share.name == 'Unknown00' or \
-                not GLOBAL_COUNTER % int(1 + 5.0 / monitor.main_perform):
+        current_bbox = image_share.bbox
+        if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 15.0
+                or (not GLOBAL_COUNTER) or (image_share.name == 'Unknown00') or
+                (not GLOBAL_COUNTER % int(6.0 + CAM_FPS))) and current_bbox != [0, 0, 1, 1]:
             event.set()
 
         previous_bbox = image_share.bbox
@@ -394,11 +424,13 @@ def main(video_record, attack_protect, show_fps):
         if show_fps:
             if not (GLOBAL_COUNTER + 1) % 2:
                 multi_frame_time = time.time()
-                fps = 2.0 / (multi_frame_time - previous_time)
+                fps = min(2.0 / (multi_frame_time - previous_time), CAM_FPS)
                 fps_f.writelines(str(time.time()) + ' ' + str(fps) + '\n')
                 previous_time = time.time()
-            cv2.putText(frame, f"FPS {fps}",
-                        (int(0.9 * frame.shape[0]), int(0.05 * frame.shape[1])),
+                if GLOBAL_COUNTER is 1:
+                    monitor.writing_time = previous_time - multi_frame_time
+            cv2.putText(frame, "FPS {:.2f}".format(fps),
+                        (int(0.95 * frame.shape[0]), int(0.05 * frame.shape[1])),
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
 
         if GLOBAL_COUNTER > 50:
@@ -423,11 +455,11 @@ def main(video_record, attack_protect, show_fps):
             event.set()
             system_checker.log_file.close()
             if show_fps:
-                fps_f.truncate()
                 fps_f.close()
 
-        loop_end = time.time()
-        monitor.main_perform = loop_end - loop_start
+        if MONITOR_ON and 0 < GLOBAL_COUNTER < 5:
+            loop_end = time.time()
+            monitor.main_perform += (loop_end - loop_start)
 
     thread1.join()
     thread2.join()
@@ -447,6 +479,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
     parser.add_argument("-t", "--tolerance", type=float, default=0.4, help="tolerance for minimal face distance")
     parser.add_argument("-f", "--fps", help="record frame rate", action='store_true')
+    parser.add_argument("-m", "--monitor", help="monitor every part's performance", action='store_true')
     args = parser.parse_args()
 
     if not 0 < args.number < 200:
@@ -462,8 +495,8 @@ if __name__ == "__main__":
     log_f.writelines('S  System Start ' + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
 
     if args.fps:
+        open('f_log.txt', 'w').close()
         fps_f = open('f_log.txt', 'a')
-        fps_f.seek(0)
 
     system_checker = SystemChecking(args.number, args.confidence, args.tolerance, 0, log_f)
 
@@ -485,6 +518,15 @@ if __name__ == "__main__":
     image_share = ImageInfoShare()
     monitor = PerformMonitor()
 
+    MONITOR_ON = args.monitor
+
     main(args.record, args.protect, args.fps)
 
-    display_fps('f_log.txt')
+    if args.monitor:
+        print('\n\nDetect: %.4f' % (monitor.detect_perform / monitor.thread_calls[0])
+              + ' | Anti-Spoof: %.4f' % (monitor.anti_spoof_perform / monitor.thread_calls[1])
+              + ' | Recognize: %.4f' % (monitor.recognize_perform / monitor.thread_calls[2])
+              + ' | Main: %.4f\n\n' % (monitor.main_perform / 4.0))
+
+    if args.fps:
+        display_fps('f_log.txt', CAM_FPS, monitor.writing_time)

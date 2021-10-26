@@ -24,8 +24,12 @@
 * 增加一点照片
 * 修改了识别不了数据库人脸的问题
 ### 2021/10/25
-* 模型转为onnx文件，加速10倍（windows cpu）
-* 加入帧率测量 -f
+* 模型转为onnx文件，加速10倍
+* 加入帧率测量 -f，画出帧率图和平均帧率、最高帧率
+### 2021/10/26
+* 优化monitor性能监视器 -m
+* 修改了无人脸时帧率降低的问题
+* tip：空循环调用全局类严重影响性能
 ## Install
 ### 配置环境
 ```
@@ -59,24 +63,6 @@ git push origin [分支名]
 ### 更新本地
 ```
 git pull https://github.com/ojipadeson/faceRecognition
-```
-
-## 运行
-### 按默认运行
-```
-python test.py
-```
-### 保存运行录像
-```
-python test.py -r
-```
-### 设置识别逻辑（测试x次(1-199)，超过p(0-1)为真才确认为真)
-```
-python test.py -n [x] -c [p]
-```
-### 启动高难度样本保护
-```
-python test.py -p
 ```
 
 ## 退出
