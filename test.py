@@ -269,8 +269,8 @@ def query_run(frame, attack_protect):
             system_checker.fuse_query.append(1 if image_share.liveness else -1)
             system_checker.antispoof_checker = image_share.antispoof_work
 
-        if len(system_checker.fuse_query) > system_checker.query_length:
-            system_checker.fuse_query.pop(0)
+            if len(system_checker.fuse_query) > system_checker.query_length:
+                system_checker.fuse_query.pop(0)
 
         if len(system_checker.fuse_query) == system_checker.query_length:
             result_text, color, frame = check_conf_sum(frame, attack_protect)
