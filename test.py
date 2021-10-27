@@ -386,7 +386,7 @@ def main(video_record, attack_protect, show_fps):
     previous_time = time.time()
     fps = 0.0
 
-    cv2.namedWindow('Video', cv2.WINDOW_NORMAL)
+    cv2.namedWindow('Video', cv2.WINDOW_FREERATIO)
 
     while not thread_exit:
         loop_start = time.time()
