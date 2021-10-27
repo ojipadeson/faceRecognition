@@ -32,7 +32,7 @@ if capture.isOpened():
 else:
     raise Exception('Cannot Open Camera.')
 
-CAM_FPS = capture.get(cv2.CAP_PROP_FPS)
+CAM_FPS = max(capture.get(cv2.CAP_PROP_FPS), 120)
 ATTACK_WARNING = False
 
 
@@ -434,6 +434,7 @@ def main(video_record, attack_protect, show_fps):
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
 
         if GLOBAL_COUNTER > 50:
+            cv2.namedWindow('Video', cv2.WINDOW_NORMAL)
             cv2.imshow('Video', frame)
         if video_record:
             out.write(frame)
