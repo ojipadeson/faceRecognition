@@ -386,6 +386,8 @@ def main(video_record, attack_protect, show_fps):
     previous_time = time.time()
     fps = 0.0
 
+    cv2.namedWindow('Video', cv2.WINDOW_NORMAL)
+
     while not thread_exit:
         loop_start = time.time()
 
@@ -434,7 +436,6 @@ def main(video_record, attack_protect, show_fps):
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
 
         if GLOBAL_COUNTER > 50:
-            cv2.namedWindow('Video', cv2.WINDOW_NORMAL)
             cv2.imshow('Video', frame)
         if video_record:
             out.write(frame)
