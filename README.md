@@ -110,7 +110,7 @@ optional arguments:
 2. Press ```Q```
 
 * If you enable system protection by command ```-p``` or ```--protect```,
-  and encounter system lock(screen grayed out), press ```-p``` to unlock
+  and encounter system lock(screen grayed out), press ```P``` to unlock
 
 * If not exit immediately, try pressing several more times
 
