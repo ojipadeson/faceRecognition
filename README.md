@@ -54,7 +54,7 @@ and name as :
    Selina01.jpg
    ...
 ```
-## Preprocessing(Can Skip)
+## Preprocessing
 ```
 python face_process.py
 ```
