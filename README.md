@@ -2,20 +2,6 @@
 
 ---
 
-The project is a face recognition system with face-detection, anti-spoof detection and face recognition.
-
-It can be deployed to *Windows, Linux, and Nvidia Jetson (arm architecture)* devices.
-
-Our Anti-Spoofing and face recognition refer to 
-**minivision-ai/Silent-Face-Anti-Spoofing**
-and 
-**ageitgey/face_recognition**.
-
-However, most open source face recognition projects do not have enough **fluency**. 
-This project uses multi-threading and some model improvement methods to make the system output frame rate **exceed 45fps**.
-
-Everyone can easily use the system in _**small indoor projects or course experiments**_. Welcome to **star** and collaborate.
-
 ## FPS on Nvidia Jetson
 ![plot](./images/fps.png)
 
