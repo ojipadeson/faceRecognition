@@ -1,73 +1,131 @@
-# faceRecognition
+# Smooth FaceRecognition
 
-## 更新日志
-### 2021/10/15 
-* 增加多次识别逻辑 -n-c 和录像 -r 和遇到高难度样本的保护机制 -p
-* 简化了main()结构
-* 检测参数全部打包在info_dict内，直接从字典调用即可
-* 合成了人脸识别部分
-### 2021/10/19
-* 增加了原始数据的人脸裁剪和输入帧处理的人脸裁剪，大大提高人脸识别准确率
-  运行命令：
-  ```
-  python face_process.py
-  ```
-* 更新了人脸识别模型的使用逻辑，大大提高系统流畅度
-* 优化了线程调度逻辑，解决了一些不能退出的bug
-### 2021/10/23
-* 由于在Jetson上pytorch似乎有性能瓶颈，单独为anti-spoofing增加了一个线程
-* 优化了线程间变量调用，全部使用ImageInfoShare类
-* 更新了人脸识别模型的使用逻辑，适配Jetson
-* train_main revision
-### 2021/10/24
-* 修改了识别数据格式--姓名+序号（00-99）.jpg
-* 增加一点照片
-* 修改了识别不了数据库人脸的问题
-### 2021/10/25
-* 模型转为onnx文件，加速10倍
-* 加入帧率测量 -f，画出帧率图和平均帧率、最高帧率
-### 2021/10/26
-* 优化monitor性能监视器 -m
-* 修改了无人脸时帧率降低的问题
-* tip：空循环调用全局类严重影响性能
-## Install
-### 配置环境
+---
+
+The project is a face recognition system with face-detection, anti-spoof detection and face recognition.
+
+It can be deployed to *Windows, Linux, and Nvidia Jetson (arm architecture)* devices.
+
+Our live detection and face recognition refer to 
+**minivision-ai/Silent-Face-Anti-Spoofing**
+and 
+**ageitgey/face_recognition**. 
+
+However, most open source face recognition projects do not have enough **fluency**. 
+This project uses multi-threading and some model improvement methods to make the system output frame rate **exceed 45fps**.
+
+Everyone can easily use the system in _**small indoor projects or course experiments**_. Welcome to **star** and collaborate.
+
+## FPS on Nvidia Jetson
+![plot](./images/fps.png)
+
+## Running Time for Each Part
+Part | Face-Detection | Anti-Spoofing | Face Recognition | Output |
+---- | ---- | ---- | ---- | ---- |
+Time | 0.0552 | 0.0770 | 0.0349 | 0.0010 |
+
+---
+
+## Install Environment
+### (on x86 device)
 ```
 pip install -r requirements.txt
 ```
-### 克隆到本地
+### (on arm device)
+Notice: Install ```pytorch``` from https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048
+and ```torchvision``` in similar way.
+## Clone
 ```
 git clone https://github.com/ojipadeson/faceRecognition
 ```
 
-## Work on faceRecognition
-### 本地修改上传
+---
+## Store some photos
+In order to recognize you, store some of your photos (>=1) into ```/face``` directory,
+and name as :
 ```
-# 做修改并将文件归档 (对每一个要修改的文件执行'git add'或执行'git add .'归档所有文件)
-git add <文件名>
-
-# 提交代码
-git commit -m "附上的评论"
-
-# 添加branch
-git branch [分支名]
-
-# 做出修改(上传到branch新建的branch)
-git push origin [分支名]
+/face
+   your_name00.jpg
+   your_name01.jpg
+   ...
+   # similar for other people
+   David00.jpg
+   Selina00.jpg
+   Selina01.jpg
+   ...
 ```
-### Pull Request
-
-* 上传新branch后，点```pull request```进行merge，
-  如果不能```automatic merge```再进行讨论或```issue```
-
-### 更新本地
+## Preprocessing(Can Skip)
 ```
-git pull https://github.com/ojipadeson/faceRecognition
+python face_process.py
 ```
+## Run
+```
+python test.py
+```
+## Optional Arguments(Can Skip)
+```-h``` help command
 
-## 退出
-* 保持video窗口置顶
-* 按q结束程序
-* 按p推出系统保护（仅-p时有用）
-* 没退出就多按几次
-  
+---
+
+```-r``` record every frame of the output video when the system is running
+
+---
+
+```-n``` set a simple logic that we gather *n* images' information before coming to a prediction for Anti-Spoofing
+
+```-c``` the confidence threshold for above logic. 
+
+For example, ```-c 0.8 -n 10``` means when over 8 of 10 pictures are tested alive 
+then the system will give the result **True Face**.
+Similarly, **Fake Face** will be given when over 8 of 10 pictures are tested Fake
+If the result don't belong to above 2 situation, video stream will show *Considering...*
+
+---
+
+```-p``` when result is neither surely real nor surely fake for a relatively long time, 
+it's very possible that the system is under attack. With this command, 
+system will **lock** when samples are difficult to predict
+
+---
+
+```-t``` the tolerance threshold for face recognition.
+When face distance is above this threshold,
+the system will treat it as *Unknown Face*
+
+---
+
+```-f``` show fps on the video output, and give a plot for fps at all time after system exit
+
+```-m``` show the running time(s) of every part of the system after exit
+
+---
+
+Concrete usages are as follows:
+
+```
+usage: test.py [-h] [-r] [-p] [-n NUMBER] [-c CONFIDENCE] [-t TOLERANCE] [-f]
+               [-m]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -r, --record          record the video
+  -p, --protect         protect system from difficult samples
+  -n NUMBER, --number NUMBER
+                        number of test time for one face
+  -c CONFIDENCE, --confidence CONFIDENCE
+                        minimal confidence for multi-test
+  -t TOLERANCE, --tolerance TOLERANCE
+                        tolerance for minimal face distance
+  -f, --fps             record frame rate
+  -m, --monitor         monitor every part's performance
+```
+## System Exit
+1. Video Windows On Top
+2. Press ```Q```
+
+* If you enable system protection by command ```-p``` or ```--protect```,
+  and encounter system lock(screen grayed out), press ```-p``` to unlock
+
+* If not exit immediately, try pressing several more times
+
+---
