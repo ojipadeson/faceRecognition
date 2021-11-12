@@ -9,6 +9,7 @@ import threading
 import argparse
 from copy import deepcopy
 
+from sklearn import svm
 import face_recognition
 
 from src.anti_spoof_predict import AntiSpoofPredict
@@ -69,7 +70,7 @@ class ImageInfoShare:
         self.liveness = False
         self.score = 0
         self.antispoof_work = 0
-        self.name = 'Unknown00'
+        self.name = 'Unknown'
 
 
 class DetectThread(threading.Thread):
@@ -168,7 +169,11 @@ class AntiSpoofingThread(threading.Thread):
 class RecognizeThread(threading.Thread):
     def __init__(self):
         super(RecognizeThread, self).__init__()
-        self.face_name = 'Unknown00'
+        global known_face_names
+        global known_face_encodings
+        self.face_name = 'Unknown'
+        self.clf = svm.LinearSVC()
+        self.clf.fit(known_face_encodings, known_face_names)
 
     def run(self):
         global thread_exit
@@ -200,14 +205,16 @@ class RecognizeThread(threading.Thread):
                     monitor.thread_calls[2] += 1
                 if len(face_encoding) > 0:
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
+                    svm_match = self.clf.predict([face_encoding[0]])
                     best_match_index = np.argmin(face_distances)
-                    if face_distances[best_match_index] < system_checker.tolerance:
+                    if svm_match == known_face_names[best_match_index] and \
+                            face_distances[best_match_index] < system_checker.tolerance:
                         thread_lock.acquire()
                         self.face_name = known_face_names[best_match_index]
                         thread_lock.release()
                     else:
                         thread_lock.acquire()
-                        self.face_name = 'Unknown00'
+                        self.face_name = 'Unknown'
                         thread_lock.release()
                 event.clear()
             else:
@@ -279,7 +286,7 @@ def query_run(frame, attack_protect):
 
         if len(system_checker.fuse_query) == system_checker.query_length:
             result_text, color, frame = check_conf_sum(frame, attack_protect)
-            result_text += (' ' + image_share.name[:-2])
+            result_text += (' ' + image_share.name)
         else:
             result_text = "Checking..."
             color = (255, 233, 0)
@@ -444,7 +451,7 @@ def main(video_record, attack_protect, show_fps):
         current_bbox = image_share.bbox
         if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 25.0
             or (not GLOBAL_COUNTER)
-            or (image_share.name == 'Unknown00')
+            or (image_share.name == 'Unknown')
             or (not GLOBAL_COUNTER % int(CAM_FPS))) \
                 and current_bbox != [0, 0, 1, 1]:
             event.set()
@@ -526,7 +533,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--protect", help="protect system from difficult samples", action='store_true')
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
     parser.add_argument("-c", "--confidence", type=float, default=0.6, help="minimal confidence for multi-test")
-    parser.add_argument("-t", "--tolerance", type=float, default=0.4, help="tolerance for minimal face distance")
+    parser.add_argument("-t", "--tolerance", type=float, default=0.6, help="tolerance for minimal face distance")
     parser.add_argument("-f", "--fps", help="record frame rate", action='store_true')
     parser.add_argument("-m", "--monitor", help="monitor every part's performance", action='store_true')
     args = parser.parse_args()
@@ -560,7 +567,7 @@ if __name__ == "__main__":
         try:
             name_face_encoding = face_recognition.face_encodings(name_image)[0]
             known_face_encodings.append(name_face_encoding)
-            known_face_names.append(file_name[:-4])
+            known_face_names.append(file_name[:-6])
         except IndexError:
             print(file_name, 'Not Explicit Face.')
 
