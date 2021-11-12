@@ -26,6 +26,7 @@ known_face_encodings = []
 known_face_names = []
 
 GLOBAL_COUNTER = 0
+# capture = cv2.VideoCapture('./sample.mp4')
 capture = cv2.VideoCapture(0)
 
 if capture.isOpened():
@@ -287,12 +288,6 @@ def query_run(frame, attack_protect):
                           (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
-    # frame = set_rect(frame)
-    #
-    # cv2.putText(frame, result_text,
-    #             (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
-    #             cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
-
     return frame, result_text, color
 
 
@@ -422,6 +417,8 @@ def main(video_record, attack_protect, show_fps):
     previous_time = time.time()
     fps = 0.0
 
+    camera_exit = True
+
     while not thread_exit:
         loop_start = time.time()
 
@@ -461,6 +458,8 @@ def main(video_record, attack_protect, show_fps):
             result_text = ''
             color = (0, 0, 0)
 
+        out_frame = set_rect(frame)
+
         if show_fps:
             if not (GLOBAL_COUNTER + 1) % 2:
                 multi_frame_time = time.time()
@@ -472,8 +471,6 @@ def main(video_record, attack_protect, show_fps):
             cv2.putText(frame, "FPS {:.2f}".format(fps),
                         (int(0.9 * frame.shape[1]), int(0.03 * frame.shape[0])),
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
-
-        out_frame = set_rect(frame)
 
         cv2.putText(out_frame, result_text,
                     (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
@@ -495,6 +492,7 @@ def main(video_record, attack_protect, show_fps):
                                                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
             event.set()
         if cv2.waitKey(1) & 0xFF == ord('q'):
+            camera_exit = False
             system_checker.log_file.writelines('C  System Close ' +
                                                time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
             thread_exit = True
@@ -507,6 +505,11 @@ def main(video_record, attack_protect, show_fps):
             loop_end = time.time()
             monitor.main_perform += (loop_end - loop_start)
 
+    if camera_exit:
+        event.set()
+        system_checker.log_file.close()
+        if show_fps:
+            fps_f.close()
     thread1.join()
     thread2.join()
     thread3.join()
