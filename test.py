@@ -14,6 +14,7 @@ import face_recognition
 from src.anti_spoof_predict import AntiSpoofPredict
 from src.generate_patches import CropImage
 from src.utility import parse_model_name, display_fps
+
 warnings.filterwarnings('ignore')
 
 thread_lock = threading.Lock()
@@ -238,6 +239,7 @@ def system_run(frame, attack_protect):
     else:
         system_checker.fuse_query = []
         system_checker.blank_to_man = True
+        frame = set_rect(frame)
 
     return frame
 
@@ -283,8 +285,10 @@ def query_run(frame, attack_protect):
                           (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
+    frame = set_rect(frame)
+
     cv2.putText(frame, result_text,
-                (int(0.05 * frame.shape[0]), int(0.1 * frame.shape[1])),
+                (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
                 cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
 
     return frame
@@ -312,15 +316,14 @@ def check_conf_sum(frame, attack_protect):
     global ATTACK_WARNING
     org_bbox = image_share.bbox
     color = (255, 255, 255)
-    result_text = "Too Frequent Operation"
+    result_text = "Checking..."
     if sum(system_checker.fuse_query) >= max(2 * system_checker.query_length * (system_checker.fuse_threshold - 0.5),
                                              1):
         result_text = "RealFace Score: {:.2f}".format(image_share.score)
         color = (255, 0, 0)
         if system_checker.warnings > 0:
             system_checker.warnings -= 1
-    elif sum(system_checker.fuse_query) <= min(-2 * system_checker.query_length * (system_checker.fuse_threshold - 0.5),
-                                               1):
+    elif sum(system_checker.fuse_query) <= 0:
         result_text = "FakeFace Score: {:.2f}".format(image_share.score)
         color = (0, 0, 255)
         if system_checker.warnings > 0:
@@ -345,6 +348,34 @@ def check_conf_sum(frame, attack_protect):
         color, 2)
 
     return result_text, color, frame
+
+
+def set_rect(frame):
+    margin = 0.3
+    alpha = 0.3
+
+    sub_img = frame[0:frame.shape[0], 0:int(margin * frame.shape[1])]
+    white_rect = np.ones(sub_img.shape, dtype=np.uint8)
+    res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
+    frame[0:frame.shape[0], 0:int(margin * frame.shape[1])] = res
+
+    sub_img = frame[0:frame.shape[0], int((1 - margin) * frame.shape[1]):frame.shape[1]]
+    white_rect = np.ones(sub_img.shape, dtype=np.uint8)
+    res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
+    frame[0:frame.shape[0], int((1 - margin) * frame.shape[1]):frame.shape[1]] = res
+
+    sub_img = frame[0:int(0.2 * frame.shape[0]), int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])]
+    white_rect = np.ones(sub_img.shape, dtype=np.uint8)
+    res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
+    frame[0:int(0.2 * frame.shape[0]), int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])] = res
+
+    sub_img = frame[int(0.8 * frame.shape[0]):frame.shape[0],
+                    int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])]
+    white_rect = np.ones(sub_img.shape, dtype=np.uint8)
+    res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
+    frame[int(0.8 * frame.shape[0]):frame.shape[0],
+          int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])] = res
+    return frame
 
 
 class PerformMonitor:
@@ -410,8 +441,10 @@ def main(video_record, attack_protect, show_fps):
 
         current_bbox = image_share.bbox
         if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 25.0
-                or (not GLOBAL_COUNTER) or (image_share.name == 'Unknown00') or
-                (not GLOBAL_COUNTER % int(6.0 + CAM_FPS))) and current_bbox != [0, 0, 1, 1]:
+            or (not GLOBAL_COUNTER)
+            or (image_share.name == 'Unknown00')
+            or (not GLOBAL_COUNTER % int(CAM_FPS))) \
+                and current_bbox != [0, 0, 1, 1]:
             event.set()
 
         previous_bbox = image_share.bbox
@@ -430,7 +463,7 @@ def main(video_record, attack_protect, show_fps):
                 if GLOBAL_COUNTER is 1:
                     monitor.writing_time = previous_time - multi_frame_time
             cv2.putText(frame, "FPS {:.2f}".format(fps),
-                        (int(0.95 * frame.shape[0]), int(0.05 * frame.shape[1])),
+                        (int(0.9 * frame.shape[1]), int(0.03 * frame.shape[0])),
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
 
         if GLOBAL_COUNTER > 50:
@@ -476,7 +509,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--record", help="record the video", action='store_true')
     parser.add_argument("-p", "--protect", help="protect system from difficult samples", action='store_true')
     parser.add_argument("-n", "--number", type=int, default=1, help="number of test time for one face")
-    parser.add_argument("-c", "--confidence", type=float, default=0.8, help="minimal confidence for multi-test")
+    parser.add_argument("-c", "--confidence", type=float, default=0.6, help="minimal confidence for multi-test")
     parser.add_argument("-t", "--tolerance", type=float, default=0.4, help="tolerance for minimal face distance")
     parser.add_argument("-f", "--fps", help="record frame rate", action='store_true')
     parser.add_argument("-m", "--monitor", help="monitor every part's performance", action='store_true')

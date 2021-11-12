@@ -57,6 +57,12 @@ class Detection:
         left, top, right, bottom = out[max_conf_index, 3]*width, out[max_conf_index, 4]*height, \
             out[max_conf_index, 5]*width, out[max_conf_index, 6]*height
         bbox = [int(left), int(top), int(right-left+1), int(bottom-top+1)]
+
+        if bbox[0] < 0.3 * width or int(right) > 0.7 * width or\
+                bbox[1] < 0.2 * height or int(bottom) > 0.8 * height:
+            face_overflow = True
+            mentioned_facebox.append([0, 0, 1, 1])
+
         return bbox, face_overflow, mentioned_facebox
 
 
