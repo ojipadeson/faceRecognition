@@ -1,0 +1,24 @@
+S  System Start 2021-11-12 08:37:35
+C  System Close 2021-11-12 08:40:32
+
+S  System Start 2021-11-12 08:41:02
+C  System Close 2021-11-12 08:41:34
+
+S  System Start 2021-11-12 09:01:32
+C  System Close 2021-11-12 09:01:43
+
+S  System Start 2021-11-12 09:02:50
+C  System Close 2021-11-12 09:04:22
+
+S  System Start 2021-11-12 09:10:09
+C  System Close 2021-11-12 09:10:21
+
+S  System Start 2021-11-12 09:10:40
+C  System Close 2021-11-12 09:11:06
+
+S  System Start 2021-11-12 09:12:12
+C  System Close 2021-11-12 09:12:28
+
+S  System Start 2021-11-12 09:14:26
+C  System Close 2021-11-12 09:17:13
+

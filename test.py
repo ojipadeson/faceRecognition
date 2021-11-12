@@ -235,13 +235,15 @@ def system_run(frame, attack_protect):
         if system_checker.blank_to_man:
             event.set()
             system_checker.blank_to_man = False
-        frame = query_run(frame, attack_protect)
+        frame, result_text, color = query_run(frame, attack_protect)
     else:
+        result_text = ''
+        color = (0, 0, 0)
         system_checker.fuse_query = []
         system_checker.blank_to_man = True
         frame = set_rect(frame)
 
-    return frame
+    return frame, result_text, color
 
 
 def query_run(frame, attack_protect):
@@ -285,13 +287,13 @@ def query_run(frame, attack_protect):
                           (org_bbox[0] + org_bbox[2], org_bbox[1] + org_bbox[3]),
                           color, int((np.sin(GLOBAL_COUNTER / 18) + 1) * 6))
 
-    frame = set_rect(frame)
+    # frame = set_rect(frame)
+    #
+    # cv2.putText(frame, result_text,
+    #             (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
+    #             cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
 
-    cv2.putText(frame, result_text,
-                (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
-                cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
-
-    return frame
+    return frame, result_text, color
 
 
 def system_lock(frame):
@@ -351,31 +353,34 @@ def check_conf_sum(frame, attack_protect):
 
 
 def set_rect(frame):
+    out_frame = frame.copy()
     margin = 0.3
-    alpha = 0.3
+    alpha = 0.0
 
-    sub_img = frame[0:frame.shape[0], 0:int(margin * frame.shape[1])]
+    sub_img = out_frame[0:out_frame.shape[0], 0:int(margin * out_frame.shape[1])]
     white_rect = np.ones(sub_img.shape, dtype=np.uint8)
     res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
-    frame[0:frame.shape[0], 0:int(margin * frame.shape[1])] = res
+    out_frame[0:out_frame.shape[0], 0:int(margin * out_frame.shape[1])] = res
 
-    sub_img = frame[0:frame.shape[0], int((1 - margin) * frame.shape[1]):frame.shape[1]]
+    sub_img = out_frame[0:out_frame.shape[0], int((1 - margin) * out_frame.shape[1]):out_frame.shape[1]]
     white_rect = np.ones(sub_img.shape, dtype=np.uint8)
     res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
-    frame[0:frame.shape[0], int((1 - margin) * frame.shape[1]):frame.shape[1]] = res
+    out_frame[0:out_frame.shape[0], int((1 - margin) * out_frame.shape[1]):out_frame.shape[1]] = res
 
-    sub_img = frame[0:int(0.2 * frame.shape[0]), int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])]
+    sub_img = out_frame[0:int(0.2 * out_frame.shape[0]),
+                        int(margin * out_frame.shape[1]):int((1 - margin) * out_frame.shape[1])]
     white_rect = np.ones(sub_img.shape, dtype=np.uint8)
     res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
-    frame[0:int(0.2 * frame.shape[0]), int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])] = res
+    out_frame[0:int(0.2 * out_frame.shape[0]),
+              int(margin * out_frame.shape[1]):int((1 - margin) * out_frame.shape[1])] = res
 
-    sub_img = frame[int(0.8 * frame.shape[0]):frame.shape[0],
-                    int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])]
+    sub_img = out_frame[int(0.8 * out_frame.shape[0]):out_frame.shape[0],
+                        int(margin * out_frame.shape[1]):int((1 - margin) * out_frame.shape[1])]
     white_rect = np.ones(sub_img.shape, dtype=np.uint8)
     res = cv2.addWeighted(sub_img, alpha, white_rect, 0.8, 0.0)
-    frame[int(0.8 * frame.shape[0]):frame.shape[0],
-          int(margin * frame.shape[1]):int((1 - margin) * frame.shape[1])] = res
-    return frame
+    out_frame[int(0.8 * out_frame.shape[0]):out_frame.shape[0],
+              int(margin * out_frame.shape[1]):int((1 - margin) * out_frame.shape[1])] = res
+    return out_frame
 
 
 class PerformMonitor:
@@ -450,9 +455,11 @@ def main(video_record, attack_protect, show_fps):
         previous_bbox = image_share.bbox
 
         if not ATTACK_WARNING:
-            frame = system_run(frame, attack_protect)
+            frame, result_text, color = system_run(frame, attack_protect)
         else:
             frame = system_lock(frame)
+            result_text = ''
+            color = (0, 0, 0)
 
         if show_fps:
             if not (GLOBAL_COUNTER + 1) % 2:
@@ -466,10 +473,16 @@ def main(video_record, attack_protect, show_fps):
                         (int(0.9 * frame.shape[1]), int(0.03 * frame.shape[0])),
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
 
+        out_frame = set_rect(frame)
+
+        cv2.putText(out_frame, result_text,
+                    (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
+
         if GLOBAL_COUNTER > 50:
-            cv2.imshow('Video', frame)
+            cv2.imshow('Video', out_frame)
         if video_record:
-            out.write(frame)
+            out.write(out_frame)
 
         GLOBAL_COUNTER += 1
         if GLOBAL_COUNTER > 1e6:
