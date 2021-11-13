@@ -23,7 +23,7 @@ time_delay = 0.03
 thread_lock = threading.Lock()
 thread_exit = False
 
-event = threading.Event()
+# event = threading.Event()
 
 known_face_encodings = []
 known_face_names = []
@@ -71,8 +71,10 @@ class ImageInfoShare:
         self.working = False
         self.liveness = False
         self.score = 0
+        self.distance = 0
         self.antispoof_work = 0
         self.name = 'Unknown'
+        self.split_pred = [0, 0, 0, 0]
 
 
 class DetectThread(threading.Thread):
@@ -108,7 +110,7 @@ class DetectThread(threading.Thread):
                 thread_lock.release()
 
             else:
-                thread_exit = True
+                pass
 
     def get_box_score(self):
         return self.org_bbox, self.overflow, self.mentioned_box, self.working
@@ -152,6 +154,8 @@ class AntiSpoofingThread(threading.Thread):
                         # prediction +=
                         # model_test.predict(img, os.path.join("./resources/anti_spoof_models", model_name))
                         prediction += model_test.predict_onnx(img, model_count)
+                        image_share.split_pred[2 * model_count - 2] = int(np.argmax(prediction))
+                        image_share.split_pred[2 * model_count - 1] = prediction[0][np.argmax(prediction)]
                         model_count += 1
                     if MONITOR_ON:
                         end = time.time()
@@ -187,7 +191,6 @@ class RecognizeThread(threading.Thread):
         image_cropper = CropImage()
 
         while not thread_exit:
-            event.wait()
             image = image_share.image
             if image is not None:
                 image_bbox = image_share.bbox
@@ -210,6 +213,7 @@ class RecognizeThread(threading.Thread):
                     face_distances = face_recognition.face_distance(known_face_encodings, face_encoding[0])
                     svm_match = self.clf.predict([face_encoding[0]])
                     best_match_index = np.argmin(face_distances)
+                    image_share.distance = np.min(face_distances)
                     if svm_match == known_face_names[best_match_index] and \
                             face_distances[best_match_index] < system_checker.tolerance:
                         thread_lock.acquire()
@@ -219,7 +223,6 @@ class RecognizeThread(threading.Thread):
                         thread_lock.acquire()
                         self.face_name = 'Unknown'
                         thread_lock.release()
-                event.clear()
             else:
                 pass
 
@@ -236,22 +239,16 @@ class SystemChecking:
         self.fuse_threshold = fuse_threshold
         self.log_file = log_file
         self.tolerance = tolerance
-        self.overflow_wait = False
-        self.blank_to_man = True
         self.antispoof_checker = 0
 
 
 def system_run(frame, attack_protect):
     if image_share.working and image_share.bbox != [0, 0, 1, 1]:
-        if system_checker.blank_to_man:
-            event.set()
-            system_checker.blank_to_man = False
         frame, result_text, color = query_run(frame, attack_protect)
     else:
         result_text = ''
         color = (0, 0, 0)
         system_checker.fuse_query = []
-        system_checker.blank_to_man = True
 
     return frame, result_text, color
 
@@ -273,12 +270,7 @@ def query_run(frame, attack_protect):
                 (other_box[0], other_box[1]),
                 (other_box[2], other_box[3]),
                 color, 2)
-        system_checker.overflow_wait = True
     else:
-        if system_checker.overflow_wait:
-            event.set()
-            system_checker.overflow_wait = False
-
         if image_share.antispoof_work != system_checker.antispoof_checker:
             system_checker.fuse_query.append(1 if image_share.liveness else -1)
             system_checker.antispoof_checker = image_share.antispoof_work
@@ -423,8 +415,9 @@ def main(video_record, attack_protect, show_fps):
     thread4.start()
 
     previous_bbox = np.zeros((4,))
-    previous_time = time.time()
+    previous_time = start_time = time.time()
     fps = 0.0
+    attack_list = ['other attack', 'no attack', '2D attack']
 
     camera_exit = True
 
@@ -451,12 +444,7 @@ def main(video_record, attack_protect, show_fps):
         thread_lock.release()
 
         current_bbox = image_share.bbox
-        if (np.linalg.norm(np.array(current_bbox) - previous_bbox) > 25.0
-            or (not GLOBAL_COUNTER)
-            or (image_share.name == 'Unknown')
-            or (not GLOBAL_COUNTER % int(CAM_FPS))) \
-                and current_bbox != [0, 0, 1, 1]:
-            event.set()
+        sudden_move = np.linalg.norm(np.array(current_bbox) - previous_bbox)
 
         previous_bbox = image_share.bbox
 
@@ -481,9 +469,36 @@ def main(video_record, attack_protect, show_fps):
                         (int(0.9 * out_frame.shape[1]), int(0.03 * out_frame.shape[0])),
                         cv2.FONT_HERSHEY_COMPLEX, 0.2 * out_frame.shape[0] / 256, (0, 255, 0))
 
+        cv2.putText(out_frame, 'distance:  {:.4f}'.format(image_share.distance),
+                    (int(0.02 * frame.shape[1]), int(0.3 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+
+        cv2.putText(out_frame, 'move:        {}'.format(int(sudden_move)),
+                    (int(0.02 * frame.shape[1]), int(0.4 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+
+        cv2.putText(out_frame, 'model 1: {}'.format(attack_list[image_share.split_pred[0]]),
+                    (int(0.02 * frame.shape[1]), int(0.5 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+        cv2.putText(out_frame, 'model 1: {:.4f}'.format(image_share.split_pred[1]),
+                    (int(0.02 * frame.shape[1]), int(0.54 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+
+        cv2.putText(out_frame, 'model 2: {}'.format(attack_list[image_share.split_pred[2]]),
+                    (int(0.02 * frame.shape[1]), int(0.6 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+        cv2.putText(out_frame, 'model 2: {:.4f}'.format(image_share.split_pred[3]),
+                    (int(0.02 * frame.shape[1]), int(0.64 * frame.shape[0])),
+                    cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (255, 255, 255))
+
         cv2.putText(out_frame, result_text,
                     (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
                     cv2.FONT_HERSHEY_COMPLEX, 0.5 * frame.shape[0] / 256, color)
+
+        if GLOBAL_COUNTER % 100:
+            cv2.putText(out_frame, 'running time: {:.2f}'.format(time.time() - start_time),
+                        (int(0.02 * frame.shape[1]), int(0.98 * frame.shape[0])),
+                        cv2.FONT_HERSHEY_COMPLEX, 0.25 * frame.shape[0] / 256, (255, 255, 255))
 
         if GLOBAL_COUNTER > 50:
             cv2.imshow('Video', out_frame)
@@ -499,13 +514,11 @@ def main(video_record, attack_protect, show_fps):
             if attack_protect:
                 system_checker.log_file.writelines('U  Admin Unlock ' +
                                                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n')
-            event.set()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             camera_exit = False
             system_checker.log_file.writelines('C  System Close ' +
                                                time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()) + '\n\n')
             thread_exit = True
-            event.set()
             system_checker.log_file.close()
             if show_fps:
                 fps_f.close()
@@ -515,7 +528,6 @@ def main(video_record, attack_protect, show_fps):
             monitor.main_perform += (loop_end - loop_start)
 
     if camera_exit:
-        event.set()
         system_checker.log_file.close()
         if show_fps:
             fps_f.close()
