@@ -18,6 +18,8 @@ from src.utility import parse_model_name, display_fps
 
 warnings.filterwarnings('ignore')
 
+time_delay = 0.03
+
 thread_lock = threading.Lock()
 thread_exit = False
 
@@ -104,6 +106,7 @@ class DetectThread(threading.Thread):
                 self.mentioned_box = mentioned_facebox
                 self.working = True
                 thread_lock.release()
+
             else:
                 thread_exit = True
 
