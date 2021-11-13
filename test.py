@@ -563,7 +563,9 @@ if __name__ == "__main__":
 
     path = 'face_box'
     print('Loading DataBase...')
-    for file_name in os.listdir(path).remove('README.md'):
+    path_list = os.listdir(path)
+    path_list.remove('README.md')
+    for file_name in path_list:
         name_image = cv2.imread(path + '/' + file_name)
         name_image = cv2.cvtColor(name_image, cv2.COLOR_BGR2RGB)
         try:

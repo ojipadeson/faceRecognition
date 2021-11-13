@@ -12,7 +12,11 @@ image_cropper = CropImage()
 
 
 def main(path, save_path, out_w, out_h):
-    for file_name in os.listdir(path):
+    path_list = os.listdir(path)
+    path_list.remove('README.md')
+    save_path_list = os.listdir(save_path)
+    save_path_list.remove('README.md')
+    for file_name in path_list:
         loading_image = cv2.imread(path + '/' + file_name)
         image = cv2.cvtColor(loading_image, cv2.COLOR_BGR2RGB)
         image_bbox, _, _ = model_test.get_bbox(image)
@@ -29,7 +33,7 @@ def main(path, save_path, out_w, out_h):
             }
             img_cut_box = image_cropper.crop(**param)
             img_saved = cv2.cvtColor(img_cut_box, cv2.COLOR_RGB2BGR)
-            if file_name not in os.listdir(save_path):
+            if file_name not in save_path_list:
                 cv2.imwrite(save_path + '/' + file_name, img_saved)
                 print('Adding {} to face_box'.format(file_name))
 
