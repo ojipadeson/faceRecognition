@@ -2,4 +2,8 @@
 /monitor_log/f_log.txt
 /monitor_log/videolog.txt
 
-*.jpg
+face/*.jpg
+face/*.png
+
+face_box/*.jpg
+face_box/*.png
