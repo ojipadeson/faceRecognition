@@ -29,7 +29,9 @@ def main(path, save_path, out_w, out_h):
             }
             img_cut_box = image_cropper.crop(**param)
             img_saved = cv2.cvtColor(img_cut_box, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(save_path + '/' + file_name, img_saved)
+            if file_name not in os.listdir(save_path):
+                cv2.imwrite(save_path + '/' + file_name, img_saved)
+                print('Adding {} to face_box'.format(file_name))
 
 
 if __name__ == "__main__":

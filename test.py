@@ -249,7 +249,6 @@ def system_run(frame, attack_protect):
         color = (0, 0, 0)
         system_checker.fuse_query = []
         system_checker.blank_to_man = True
-        frame = set_rect(frame)
 
     return frame, result_text, color
 
@@ -357,7 +356,7 @@ def check_conf_sum(frame, attack_protect):
 def set_rect(frame):
     out_frame = frame.copy()
     margin = 0.3
-    alpha = 0.0
+    alpha = 0.2
 
     sub_img = out_frame[0:out_frame.shape[0], 0:int(margin * out_frame.shape[1])]
     white_rect = np.ones(sub_img.shape, dtype=np.uint8)
@@ -475,9 +474,9 @@ def main(video_record, attack_protect, show_fps):
                 previous_time = time.time()
                 if GLOBAL_COUNTER is 1:
                     monitor.writing_time = previous_time - multi_frame_time
-            cv2.putText(frame, "FPS {:.2f}".format(fps),
-                        (int(0.9 * frame.shape[1]), int(0.03 * frame.shape[0])),
-                        cv2.FONT_HERSHEY_COMPLEX, 0.2 * frame.shape[0] / 256, (0, 255, 0))
+            cv2.putText(out_frame, "FPS {:.2f}".format(fps),
+                        (int(0.9 * out_frame.shape[1]), int(0.03 * out_frame.shape[0])),
+                        cv2.FONT_HERSHEY_COMPLEX, 0.2 * out_frame.shape[0] / 256, (0, 255, 0))
 
         cv2.putText(out_frame, result_text,
                     (int(0.02 * frame.shape[1]), int(0.07 * frame.shape[0])),
